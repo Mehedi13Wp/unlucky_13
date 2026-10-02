@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\LeadController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function (): void {
@@ -24,6 +25,9 @@ Route::middleware('auth')->group(function (): void {
         ->name('campaigns.status');
     Route::patch('/campaigns/{campaign}/archive', [CampaignController::class, 'archive'])
         ->name('campaigns.archive');
+
+    Route::resource('leads', LeadController::class)
+        ->only(['index', 'create', 'store', 'show']);
 
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 });

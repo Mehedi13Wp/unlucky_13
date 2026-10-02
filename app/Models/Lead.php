@@ -54,6 +54,11 @@ class Lead extends Model
         ];
     }
 
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
+
     public function campaign(): BelongsTo
     {
         return $this->belongsTo(Campaign::class);
