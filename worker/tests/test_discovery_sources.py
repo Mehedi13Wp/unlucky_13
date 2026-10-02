@@ -69,6 +69,64 @@ class OpenStreetMapDiscoverySourceTest(unittest.TestCase):
         self.assertEqual(2, len(calls))
         self.assertEqual("GET", calls[0][0])
         self.assertEqual("POST", calls[1][0])
+        self.assertIn('["website"]', calls[1][2].decode("utf-8"))
+
+    def test_falls_back_to_second_overpass_provider(self):
+        post_urls = []
+
+        def requester(method, url, data):
+            if method == "GET":
+                return [
+                    {
+                        "boundingbox": [
+                            "40.7000",
+                            "40.8000",
+                            "-74.0500",
+                            "-73.9000",
+                        ]
+                    }
+                ]
+
+            post_urls.append(url)
+
+            if len(post_urls) == 1:
+                raise DiscoverySourceError("Discovery provider returned HTTP 504.")
+
+            return {
+                "elements": [
+                    {
+                        "type": "node",
+                        "id": 789,
+                        "tags": {
+                            "name": "Fallback Restaurant",
+                            "website": "https://fallback.example",
+                        },
+                    }
+                ]
+            }
+
+        source = OpenStreetMapDiscoverySource(
+            user_agent="Unlucky13-Test/1.0",
+            requester=requester,
+            sleeper=lambda _: None,
+        )
+
+        candidates = source.discover(
+            {
+                "target_industry": "Restaurants",
+                "target_countries": ["United States"],
+                "target_cities": ["New York"],
+            },
+            limit=5,
+        )
+
+        self.assertEqual(1, len(candidates))
+        self.assertEqual("Fallback Restaurant", candidates[0]["business_name"])
+        self.assertGreaterEqual(len(post_urls), 2)
+        self.assertEqual(
+            "https://overpass.kumi.systems/api/interpreter",
+            post_urls[1],
+        )
 
     def test_unsupported_industry_fails_without_network_request(self):
         called = False

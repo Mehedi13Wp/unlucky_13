@@ -56,25 +56,14 @@ python worker/run.py health
 python worker/run.py campaigns
 ```
 
-Validate a candidate file without sending:
-
-```bash
-python worker/run.py ingest --campaign YOUR_CAMPAIGN_UUID --file worker/examples/leads.sample.json --dry-run
-```
-
-Send the candidates:
-
-```bash
-python worker/run.py ingest --campaign YOUR_CAMPAIGN_UUID --file worker/examples/leads.sample.json
-```
-
 ## OpenStreetMap discovery adapter
 
 The first live discovery adapter uses public OpenStreetMap business data. It intentionally keeps the scope conservative:
 
 - only active campaigns are processed
 - a campaign must have a supported industry mapping and target geography
-- the adapter keeps only businesses that publish a website URL
+- the Overpass query asks only for business records that already publish a website-like tag
+- if the primary Overpass endpoint is temporarily unavailable, the worker tries a second public endpoint
 - Nominatim geocoding is rate-limited to at least one second between requests
 - discovery records keep their OpenStreetMap source URL for auditability
 - no email is sent and no outreach occurs during discovery
@@ -105,13 +94,13 @@ After discovery, run the website analyzer:
 python worker/run.py analyze --limit 10
 ```
 
-Public OpenStreetMap/Nominatim/Overpass services have usage policies and shared capacity. This adapter is for conservative personal testing. Keep limits low, identify the application with a custom user agent, and move to an appropriate hosted/self-hosted provider if usage grows.
+Public OpenStreetMap/Nominatim/Overpass services are shared infrastructure. Keep personal testing conservative, identify the application with a custom user agent, and move to an appropriate hosted/self-hosted provider if usage grows.
 
 ## Reliability and safety
 
 - API token is never committed
-- client retries temporary connection failures, HTTP 429, and server errors
-- discovery commands use conservative batch limits
+- client retries temporary Laravel API connection failures, HTTP 429, and server errors
+- discovery uses conservative batch limits and provider fallback
 - ingestion does not send email or outreach
 - only active campaigns receive discoveries
 - source attribution is preserved

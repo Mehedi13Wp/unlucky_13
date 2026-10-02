@@ -30,6 +30,12 @@ class OpenStreetMapDiscoverySource:
         (("gym", "fitness"), (("leisure", "fitness_centre"),)),
     )
 
+    WEBSITE_TAGS = ("website", "contact:website", "url")
+    OVERPASS_FALLBACK_URLS = (
+        "https://overpass-api.de/api/interpreter",
+        "https://overpass.kumi.systems/api/interpreter",
+    )
+
     def __init__(
         self,
         user_agent: str,
@@ -42,7 +48,14 @@ class OpenStreetMapDiscoverySource:
     ) -> None:
         self.user_agent = user_agent
         self.nominatim_url = nominatim_url.rstrip("/")
-        self.overpass_url = overpass_url
+        self.overpass_urls = tuple(
+            dict.fromkeys(
+                [
+                    overpass_url,
+                    *self.OVERPASS_FALLBACK_URLS,
+                ]
+            )
+        )
         self.timeout_seconds = timeout_seconds
         self.delay_seconds = max(1.0, delay_seconds)
         self.requester = requester or self._request_json
@@ -135,19 +148,39 @@ class OpenStreetMapDiscoverySource:
         selectors: tuple[tuple[str, str], ...],
     ) -> list[dict[str, Any]]:
         south, west, north, east = bbox
+
+        # Filter for website-bearing businesses at the provider so dense cities do not
+        # require downloading every POI in the selected industry.
         selector_lines = "".join(
-            f'nwr["{key}"="{value}"]({south},{west},{north},{east});'
+            f'nwr["{key}"="{value}"]["{website_tag}"]({south},{west},{north},{east});'
             for key, value in selectors
+            for website_tag in self.WEBSITE_TAGS
         )
         query = f"[out:json][timeout:25];({selector_lines});out center tags;"
         payload = urlencode({"data": query}).encode("utf-8")
-        response = self.requester("POST", self.overpass_url, payload)
 
-        if not isinstance(response, dict):
-            raise DiscoverySourceError("OpenStreetMap discovery returned an invalid response.")
+        errors: list[str] = []
 
-        elements = response.get("elements", [])
-        return [item for item in elements if isinstance(item, dict)]
+        for index, endpoint in enumerate(self.overpass_urls):
+            try:
+                response = self.requester("POST", endpoint, payload)
+            except DiscoverySourceError as error:
+                errors.append(f"{endpoint}: {error}")
+                if index < len(self.overpass_urls) - 1:
+                    self.sleeper(self.delay_seconds)
+                continue
+
+            if not isinstance(response, dict):
+                errors.append(f"{endpoint}: invalid JSON shape")
+                if index < len(self.overpass_urls) - 1:
+                    self.sleeper(self.delay_seconds)
+                continue
+
+            elements = response.get("elements", [])
+            return [item for item in elements if isinstance(item, dict)]
+
+        detail = "; ".join(errors) if errors else "no provider response"
+        raise DiscoverySourceError(f"All Overpass providers failed: {detail}")
 
     def _candidate_from_element(
         self,
