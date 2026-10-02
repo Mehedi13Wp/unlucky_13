@@ -247,9 +247,10 @@ class OpenStreetMapDiscoverySource:
             raise DiscoverySourceError(
                 f"Discovery provider returned HTTP {error.code}."
             ) from error
-        except URLError as error:
+        except (URLError, TimeoutError) as error:
+            reason = getattr(error, "reason", None) or str(error) or "request timed out"
             raise DiscoverySourceError(
-                f"Could not reach discovery provider: {error.reason}"
+                f"Could not reach discovery provider: {reason}"
             ) from error
         except json.JSONDecodeError as error:
             raise DiscoverySourceError("Discovery provider returned invalid JSON.") from error

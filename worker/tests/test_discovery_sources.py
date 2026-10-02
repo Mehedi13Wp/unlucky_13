@@ -1,4 +1,5 @@
 import unittest
+from urllib.parse import parse_qs
 
 from worker.unlucky13_worker.discovery_sources import (
     DiscoverySourceError,
@@ -69,7 +70,11 @@ class OpenStreetMapDiscoverySourceTest(unittest.TestCase):
         self.assertEqual(2, len(calls))
         self.assertEqual("GET", calls[0][0])
         self.assertEqual("POST", calls[1][0])
-        self.assertIn('["website"]', calls[1][2].decode("utf-8"))
+
+        query = parse_qs(calls[1][2].decode("utf-8"))["data"][0]
+        self.assertIn('["website"]', query)
+        self.assertIn('["contact:website"]', query)
+        self.assertIn('["url"]', query)
 
     def test_falls_back_to_second_overpass_provider(self):
         post_urls = []
