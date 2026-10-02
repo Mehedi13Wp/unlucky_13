@@ -142,7 +142,7 @@ class LeadController extends Controller
         $lead->load([
             'campaign',
             'contacts',
-            'outreachDrafts' => fn ($query) => $query->with('contact')->latest(),
+            'outreachDrafts' => fn ($query) => $query->with(['contact', 'message'])->latest(),
         ]);
 
         $this->ensureOwner($request, $lead);

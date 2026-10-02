@@ -83,6 +83,17 @@ class WorkerApiClient:
             draft,
         )
 
+    def delivery_queue(self, limit: int = 5) -> dict[str, Any]:
+        safe_limit = max(1, min(limit, 25))
+        return self._request("GET", f"/api/worker/delivery/queue?limit={safe_limit}")
+
+    def send_approved_draft(self, draft_id: int) -> dict[str, Any]:
+        return self._request(
+            "POST",
+            f"/api/worker/outreach-drafts/{int(draft_id)}/send",
+            allow_retries=False,
+        )
+
     def start_analysis(self, lead_uuid: str) -> dict[str, Any]:
         return self._request("POST", f"/api/worker/leads/{lead_uuid}/analysis/start")
 
@@ -108,6 +119,7 @@ class WorkerApiClient:
         method: str,
         path: str,
         payload: dict[str, Any] | None = None,
+        allow_retries: bool = True,
     ) -> dict[str, Any]:
         data = None if payload is None else json.dumps(payload).encode("utf-8")
         request = Request(
@@ -122,7 +134,9 @@ class WorkerApiClient:
             },
         )
 
-        for attempt in range(self.max_retries + 1):
+        max_attempts = self.max_retries if allow_retries else 0
+
+        for attempt in range(max_attempts + 1):
             try:
                 with self.opener(request, timeout=self.timeout_seconds) as response:
                     body = response.read().decode("utf-8")
@@ -132,13 +146,17 @@ class WorkerApiClient:
                 parsed = self._parse_json(body)
                 message = str(parsed.get("message") or error.reason or "API request failed")
 
-                if self._should_retry(error.code) and attempt < self.max_retries:
+                if (
+                    allow_retries
+                    and self._should_retry(error.code)
+                    and attempt < max_attempts
+                ):
                     self.sleeper(self._retry_delay(attempt))
                     continue
 
                 raise WorkerApiError(error.code, message, parsed) from error
             except URLError as error:
-                if attempt < self.max_retries:
+                if allow_retries and attempt < max_attempts:
                     self.sleeper(self._retry_delay(attempt))
                     continue
 

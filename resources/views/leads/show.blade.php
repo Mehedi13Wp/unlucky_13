@@ -153,7 +153,15 @@
                             </form>
                         </div>
                     @elseif ($latestDraft->status === 'approved')
-                        <p class="lead-reason">Approved for the future sending pipeline. Nothing has been sent yet.</p>
+                        @if ($latestDraft->channel === 'email')
+                            <p class="lead-reason">Approved and waiting for explicit controlled email delivery. Nothing has been sent yet.</p>
+                        @else
+                            <p class="lead-reason">Approved for manual contact-form outreach. The automated sender will not submit public web forms.</p>
+                        @endif
+                    @elseif ($latestDraft->status === 'sending')
+                        <p class="lead-reason">Delivery started and is awaiting reconciliation. Do not retry automatically.</p>
+                    @elseif ($latestDraft->status === 'sent')
+                        <p class="lead-reason">Controlled email delivery completed. Check the lifecycle timestamps for contact history.</p>
                     @endif
                 @else
                     <p class="lead-reason">No outreach draft has been generated yet.</p>

@@ -87,6 +87,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Preview generated drafts without saving them to Laravel.",
     )
 
+    send = subparsers.add_parser(
+        "send-approved",
+        help="Deliver approved email drafts under campaign and suppression controls.",
+    )
+    send.add_argument("--limit", type=int, default=5, help="Maximum approved email drafts per run")
+    send.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show delivery eligibility without sending email.",
+    )
+
     queue = subparsers.add_parser(
         "analysis-queue",
         help="Show leads waiting for analysis.",
@@ -372,6 +383,78 @@ def main(argv: list[str] | None = None) -> int:
 
             print(
                 f"Finished. drafted={len(leads)} submitted={submitted} failed={failed}"
+            )
+            return 1 if failed else 0
+
+        if args.command == "send-approved":
+            queue_result = client.delivery_queue(args.limit)
+            drafts = queue_result.get("drafts", [])
+            mailer = queue_result.get("mailer", "unknown")
+            delivery_capable = bool(queue_result.get("delivery_capable"))
+
+            print(
+                f"Mailer: {mailer} "
+                f"(delivery_capable={str(delivery_capable).lower()})"
+            )
+
+            if not drafts:
+                print("No approved email drafts are waiting for controlled delivery.")
+                return 0
+
+            sent = 0
+            blocked = 0
+            failed = 0
+
+            for index, draft in enumerate(drafts, start=1):
+                campaign = draft.get("campaign") or {}
+
+                print(
+                    f"[{index}/{len(drafts)}] {draft.get('business_name')} "
+                    f"-> {draft.get('recipient')} "
+                    f"remaining_today={campaign.get('remaining_today')}"
+                )
+
+                if not draft.get("eligible"):
+                    blocked += 1
+                    print(
+                        f"  blocked: "
+                        f"{draft.get('blocked_reason') or 'delivery_policy'}"
+                    )
+                    continue
+
+                if args.dry_run:
+                    if delivery_capable:
+                        print("  dry-run: eligible and not sent")
+                    else:
+                        print(
+                            "  dry-run: eligible, but real mail delivery "
+                            "is not configured"
+                        )
+                    continue
+
+                if not delivery_capable:
+                    blocked += 1
+                    print(
+                        "  blocked: configure a real delivery mailer before sending"
+                    )
+                    continue
+
+                try:
+                    response = client.send_approved_draft(int(draft["draft_id"]))
+                    status = response.get("status", "unknown")
+                    print(f"  result: {status}")
+
+                    if status in {"sent", "already_sent"}:
+                        sent += 1
+                    else:
+                        failed += 1
+                except WorkerApiError as error:
+                    failed += 1
+                    print(f"  failed: {error}", file=sys.stderr)
+
+            print(
+                f"Finished. queued={len(drafts)} sent={sent} "
+                f"blocked={blocked} failed={failed}"
             )
             return 1 if failed else 0
 

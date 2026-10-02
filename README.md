@@ -61,4 +61,5 @@ GitHub is the source of truth. Pull before starting work and commit/push complet
 - qualified-lead public contact discovery complete
 - fact-grounded personalized outreach drafting complete
 - human Review Before Send approve/reject workflow complete
-- next product milestone: controlled delivery, suppression, and reply tracking
+- controlled approved-email delivery foundation complete with daily-limit and suppression checks
+- next product milestone: provider events, unsubscribe/bounce/reply handling, and alerts

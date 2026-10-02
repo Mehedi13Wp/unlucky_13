@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\WorkerAnalysisController;
 use App\Http\Controllers\Api\WorkerCampaignController;
 use App\Http\Controllers\Api\WorkerContactDiscoveryController;
+use App\Http\Controllers\Api\WorkerDeliveryController;
 use App\Http\Controllers\Api\WorkerDiscoveryController;
 use App\Http\Controllers\Api\WorkerOutreachDraftController;
 use App\Http\Middleware\RequireWorkerToken;
@@ -39,4 +40,9 @@ Route::prefix('worker')
             ->name('api.worker.outreach-drafts.queue');
         Route::post('/leads/{lead}/outreach-drafts', [WorkerOutreachDraftController::class, 'complete'])
             ->name('api.worker.outreach-drafts.store');
+
+        Route::get('/delivery/queue', [WorkerDeliveryController::class, 'queue'])
+            ->name('api.worker.delivery.queue');
+        Route::post('/outreach-drafts/{outreachDraft}/send', [WorkerDeliveryController::class, 'send'])
+            ->name('api.worker.delivery.send');
     });

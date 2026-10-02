@@ -20,6 +20,8 @@ python worker/run.py contacts --limit 5 --dry-run
 python worker/run.py contacts --limit 5
 python worker/run.py drafts --limit 5 --dry-run
 python worker/run.py drafts --limit 5
+python worker/run.py send-approved --limit 5 --dry-run
+python worker/run.py send-approved --limit 5
 python -m unittest discover -s worker/tests -v
 ```
 
@@ -107,6 +109,38 @@ python worker/run.py drafts --limit 5
 
 Created drafts move the lead to `ready_for_review`. The lead detail page lets the authenticated owner approve or reject the latest pending draft. Approval changes the lead to `approved` but still sends nothing.
 
+## Controlled email delivery
+
+Only human-approved email drafts can enter automated delivery. The delivery API enforces:
+
+- active campaign status
+- lead and draft approval state
+- campaign daily outreach limit
+- active email suppression records
+- one delivery record per draft
+- no automatic HTTP retry on the send operation
+- a real delivery-capable Laravel mailer; `log` and `array` are refused
+
+Preview the queue and policy state without sending:
+
+```bash
+python worker/run.py send-approved --limit 5 --dry-run
+```
+
+After configuring a real mail provider in local environment variables, explicitly send eligible approved email drafts:
+
+```bash
+python worker/run.py send-approved --limit 5
+```
+
+Public contact-form drafts are intentionally not auto-submitted. They remain manual.
+
+To suppress an email address immediately:
+
+```bash
+php artisan unlucky13:suppress-email person@example.com --reason=unsubscribe
+```
+
 ## Next worker milestone
 
-The next milestone is controlled email delivery with suppression, unsubscribe, bounce, and reply handling.
+The next milestone is provider event handling for bounce, unsubscribe, reply classification, and interested-lead alerts.

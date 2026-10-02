@@ -49,20 +49,11 @@ class WorkerApiClientTest(unittest.TestCase):
             captured["url"] = request.full_url
             return FakeResponse({"count": 1, "campaigns": [{"uuid": "abc"}]})
 
-        client = WorkerApiClient(
-            "http://127.0.0.1:8000",
-            "secret-token",
-            opener=opener,
-            sleeper=lambda _: None,
-        )
-
+        client = WorkerApiClient("http://127.0.0.1:8000", "secret-token", opener=opener, sleeper=lambda _: None)
         result = client.active_campaigns()
 
         self.assertEqual(1, result["count"])
-        self.assertEqual(
-            "http://127.0.0.1:8000/api/worker/campaigns",
-            captured["url"],
-        )
+        self.assertEqual("http://127.0.0.1:8000/api/worker/campaigns", captured["url"])
 
     def test_contact_discovery_queue_uses_worker_endpoint(self):
         captured = {}
@@ -71,20 +62,11 @@ class WorkerApiClientTest(unittest.TestCase):
             captured["url"] = request.full_url
             return FakeResponse({"count": 1, "leads": [{"uuid": "lead-1"}]})
 
-        client = WorkerApiClient(
-            "http://127.0.0.1:8000",
-            "secret-token",
-            opener=opener,
-            sleeper=lambda _: None,
-        )
-
+        client = WorkerApiClient("http://127.0.0.1:8000", "secret-token", opener=opener, sleeper=lambda _: None)
         result = client.contact_discovery_queue(limit=5)
 
         self.assertEqual(1, result["count"])
-        self.assertEqual(
-            "http://127.0.0.1:8000/api/worker/contact-discovery/queue?limit=5",
-            captured["url"],
-        )
+        self.assertEqual("http://127.0.0.1:8000/api/worker/contact-discovery/queue?limit=5", captured["url"])
 
     def test_outreach_draft_queue_uses_worker_endpoint(self):
         captured = {}
@@ -93,20 +75,38 @@ class WorkerApiClientTest(unittest.TestCase):
             captured["url"] = request.full_url
             return FakeResponse({"count": 1, "leads": [{"uuid": "lead-1"}]})
 
+        client = WorkerApiClient("http://127.0.0.1:8000", "secret-token", opener=opener, sleeper=lambda _: None)
+        result = client.outreach_draft_queue(limit=3)
+
+        self.assertEqual(1, result["count"])
+        self.assertEqual("http://127.0.0.1:8000/api/worker/outreach-drafts/queue?limit=3", captured["url"])
+
+    def test_delivery_send_disables_automatic_retries(self):
+        calls = {"count": 0}
+
+        def opener(request, timeout):
+            calls["count"] += 1
+            payload = json.dumps({"message": "Temporary delivery error"}).encode("utf-8")
+            raise HTTPError(
+                request.full_url,
+                503,
+                "Unavailable",
+                hdrs=None,
+                fp=io.BytesIO(payload),
+            )
+
         client = WorkerApiClient(
             "http://127.0.0.1:8000",
             "secret-token",
+            max_retries=3,
             opener=opener,
             sleeper=lambda _: None,
         )
 
-        result = client.outreach_draft_queue(limit=3)
+        with self.assertRaises(WorkerApiError):
+            client.send_approved_draft(7)
 
-        self.assertEqual(1, result["count"])
-        self.assertEqual(
-            "http://127.0.0.1:8000/api/worker/outreach-drafts/queue?limit=3",
-            captured["url"],
-        )
+        self.assertEqual(1, calls["count"])
 
     def test_non_retryable_api_error_is_exposed(self):
         def opener(request, timeout):
