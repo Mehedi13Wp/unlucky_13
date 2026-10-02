@@ -33,7 +33,7 @@ class WorkerConfig:
     nominatim_url: str = "https://nominatim.openstreetmap.org"
     overpass_url: str = "https://overpass-api.de/api/interpreter"
     discovery_delay_seconds: float = 1.1
-    discovery_timeout_seconds: float = 45.0
+    discovery_timeout_seconds: float = 25.0
 
     @classmethod
     def from_environment(cls) -> "WorkerConfig":
@@ -57,7 +57,7 @@ class WorkerConfig:
             "https://overpass-api.de/api/interpreter",
         ).strip()
         discovery_delay = float(os.getenv("UNLUCKY13_DISCOVERY_DELAY", "1.1"))
-        discovery_timeout = float(os.getenv("UNLUCKY13_DISCOVERY_TIMEOUT", "45"))
+        discovery_timeout = float(os.getenv("UNLUCKY13_DISCOVERY_TIMEOUT", "25"))
 
         if not token:
             raise ValueError("UNLUCKY13_WORKER_TOKEN is missing. Add it to the project .env file.")

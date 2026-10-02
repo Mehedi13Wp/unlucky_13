@@ -58,7 +58,7 @@ class OpenStreetMapDiscoverySourceTest(unittest.TestCase):
                 "target_countries": ["United States"],
                 "target_cities": ["New York"],
             },
-            limit=10,
+            limit=1,
         )
 
         self.assertEqual(1, len(candidates))
@@ -75,6 +75,7 @@ class OpenStreetMapDiscoverySourceTest(unittest.TestCase):
         self.assertIn('["website"]', query)
         self.assertIn('["contact:website"]', query)
         self.assertIn('["url"]', query)
+        self.assertIn("out tags center qt", query)
 
     def test_geocode_retries_transient_provider_timeout(self):
         get_attempts = 0
@@ -175,6 +176,18 @@ class OpenStreetMapDiscoverySourceTest(unittest.TestCase):
             "https://overpass.kumi.systems/api/interpreter",
             post_urls[1],
         )
+
+    def test_splits_large_bbox_and_queries_center_tile_first(self):
+        source = OpenStreetMapDiscoverySource(
+            user_agent="Unlucky13-Test/1.0",
+            requester=lambda method, url, data: {},
+            sleeper=lambda _: None,
+        )
+
+        tiles = source._split_bbox((0.0, 0.0, 9.0, 9.0), grid_size=3)
+
+        self.assertEqual(9, len(tiles))
+        self.assertEqual((3.0, 3.0, 6.0, 6.0), tiles[0])
 
     def test_unsupported_industry_fails_without_network_request(self):
         called = False

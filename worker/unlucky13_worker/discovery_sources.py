@@ -89,28 +89,45 @@ class OpenStreetMapDiscoverySource:
             bbox = self._geocode(location_query)
             self.sleeper(self.delay_seconds)
 
-            elements = self._query_overpass(bbox, selectors)
+            tiles = self._split_bbox(bbox, grid_size=3)
 
-            for element in elements:
-                candidate = self._candidate_from_element(
-                    element=element,
-                    campaign=campaign,
-                    country=country,
-                    city=city,
+            for tile_index, tile in enumerate(tiles):
+                remaining = safe_limit - len(candidates)
+                if remaining <= 0:
+                    break
+
+                elements = self._query_overpass(
+                    tile,
+                    selectors,
+                    max_results=max(20, remaining * 3),
                 )
 
-                if candidate is None:
-                    continue
+                for element in elements:
+                    candidate = self._candidate_from_element(
+                        element=element,
+                        campaign=campaign,
+                        country=country,
+                        city=city,
+                    )
 
-                domain = self._domain(candidate["website_url"])
-                if not domain or domain in seen_domains:
-                    continue
+                    if candidate is None:
+                        continue
 
-                seen_domains.add(domain)
-                candidates.append(candidate)
+                    domain = self._domain(candidate["website_url"])
+                    if not domain or domain in seen_domains:
+                        continue
+
+                    seen_domains.add(domain)
+                    candidates.append(candidate)
+
+                    if len(candidates) >= safe_limit:
+                        break
 
                 if len(candidates) >= safe_limit:
                     break
+
+                if tile_index < len(tiles) - 1:
+                    self.sleeper(self.delay_seconds)
 
             if len(candidates) < safe_limit:
                 self.sleeper(self.delay_seconds)
@@ -168,6 +185,7 @@ class OpenStreetMapDiscoverySource:
         self,
         bbox: tuple[float, float, float, float],
         selectors: tuple[tuple[str, str], ...],
+        max_results: int = 50,
     ) -> list[dict[str, Any]]:
         south, west, north, east = bbox
 
@@ -176,7 +194,11 @@ class OpenStreetMapDiscoverySource:
             for key, value in selectors
             for website_tag in self.WEBSITE_TAGS
         )
-        query = f"[out:json][timeout:25];({selector_lines});out center tags;"
+        safe_output_limit = max(1, min(int(max_results), 200))
+        query = (
+            f"[out:json][timeout:15];({selector_lines});"
+            f"out tags center qt {safe_output_limit};"
+        )
         payload = urlencode({"data": query}).encode("utf-8")
 
         errors: list[str] = []
@@ -201,6 +223,42 @@ class OpenStreetMapDiscoverySource:
 
         detail = "; ".join(errors) if errors else "no provider response"
         raise DiscoverySourceError(f"All Overpass providers failed: {detail}")
+
+    @staticmethod
+    def _split_bbox(
+        bbox: tuple[float, float, float, float],
+        grid_size: int = 3,
+    ) -> list[tuple[float, float, float, float]]:
+        south, west, north, east = bbox
+        size = max(1, min(int(grid_size), 5))
+        lat_step = (north - south) / size
+        lon_step = (east - west) / size
+        center = (size - 1) / 2
+        tiles: list[tuple[float, float, float, float, float]] = []
+
+        for row in range(size):
+            for column in range(size):
+                tile_south = south + (row * lat_step)
+                tile_north = north if row == size - 1 else tile_south + lat_step
+                tile_west = west + (column * lon_step)
+                tile_east = east if column == size - 1 else tile_west + lon_step
+                distance = abs(row - center) + abs(column - center)
+                tiles.append(
+                    (
+                        distance,
+                        tile_south,
+                        tile_west,
+                        tile_north,
+                        tile_east,
+                    )
+                )
+
+        tiles.sort(key=lambda item: item[0])
+
+        return [
+            (tile_south, tile_west, tile_north, tile_east)
+            for _, tile_south, tile_west, tile_north, tile_east in tiles
+        ]
 
     def _candidate_from_element(
         self,
