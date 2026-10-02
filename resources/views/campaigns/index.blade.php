@@ -16,8 +16,8 @@
 
 @section('content')
     @php
-        $activeCount = $campaigns->where('status', AppEnumsCampaignStatus::Active)->count();
-        $draftCount = $campaigns->where('status', AppEnumsCampaignStatus::Draft)->count();
+        $activeCount = $campaigns->filter(fn ($campaign) => $campaign->status->value === 'active')->count();
+        $draftCount = $campaigns->filter(fn ($campaign) => $campaign->status->value === 'draft')->count();
         $totalLeads = $campaigns->sum('leads_count');
     @endphp
 
@@ -70,7 +70,7 @@
                 </div>
 
                 <div class="campaign-card-body">
-                    <p>{{ IlluminateSupportStr::limit($campaign->service_offer, 115) }}</p>
+                    <p>{{ str($campaign->service_offer)->limit(115) }}</p>
 
                     <div class="campaign-meta-grid">
                         <div>
