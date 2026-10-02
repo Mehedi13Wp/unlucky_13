@@ -51,4 +51,5 @@ GitHub is the source of truth. Pull before starting work and commit/push complet
 - premium responsive dashboard complete
 - professional responsive campaign workspace complete
 - lead management workspace foundation complete
-- next product milestone: authenticated discovery API for the Python worker
+- authenticated discovery API foundation complete
+- next product milestone: Python discovery worker client and qualification pipeline

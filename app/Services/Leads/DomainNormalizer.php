@@ -34,6 +34,10 @@ class DomainNormalizer
             $domain = substr($domain, 4);
         }
 
+        if (filter_var($domain, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME) === false) {
+            $domain = null;
+        }
+
         return [
             'website_url' => $normalizedUrl,
             'domain' => $domain ?: null,
