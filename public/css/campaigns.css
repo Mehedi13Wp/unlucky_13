@@ -804,3 +804,38 @@
         white-space: normal;
     }
 }
+
+
+/* Permanent campaign deletion */
+.danger-zone {
+    border-color: rgba(240, 68, 85, .34);
+    background:
+        linear-gradient(180deg, rgba(58, 21, 26, .44), rgba(31, 17, 20, .62)),
+        rgba(17, 31, 23, .92);
+}
+
+.danger-eyebrow {
+    color: #ff7f8a;
+}
+
+.danger-zone > p {
+    margin: 13px 0 17px;
+    color: #c7a0a4;
+    font-size: 9px;
+    line-height: 1.6;
+}
+
+.delete-form {
+    display: grid;
+    gap: 12px;
+}
+
+.delete-form .field input {
+    border-color: rgba(240, 68, 85, .28);
+    background: rgba(28, 14, 17, .72);
+}
+
+.delete-form .field input:focus {
+    border-color: rgba(240, 68, 85, .68);
+    box-shadow: 0 0 0 3px rgba(240, 68, 85, .1);
+}
