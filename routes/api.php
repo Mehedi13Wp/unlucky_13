@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\WorkerAnalysisController;
 use App\Http\Controllers\Api\WorkerCampaignController;
+use App\Http\Controllers\Api\WorkerContactDiscoveryController;
 use App\Http\Controllers\Api\WorkerDiscoveryController;
 use App\Http\Middleware\RequireWorkerToken;
 use Illuminate\Support\Facades\Route;
@@ -27,4 +28,9 @@ Route::prefix('worker')
             ->name('api.worker.analysis.start');
         Route::post('/leads/{lead}/analysis/complete', [WorkerAnalysisController::class, 'complete'])
             ->name('api.worker.analysis.complete');
+
+        Route::get('/contact-discovery/queue', [WorkerContactDiscoveryController::class, 'queue'])
+            ->name('api.worker.contact-discovery.queue');
+        Route::post('/leads/{lead}/contacts/complete', [WorkerContactDiscoveryController::class, 'complete'])
+            ->name('api.worker.contacts.complete');
     });

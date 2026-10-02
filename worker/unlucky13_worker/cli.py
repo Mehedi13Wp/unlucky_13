@@ -7,6 +7,7 @@ import time
 
 from .candidates import load_candidates
 from .client import WorkerApiClient, WorkerApiError
+from .contact_discovery import ContactDiscoveryError, ContactFinder
 from .config import WorkerConfig
 from .discovery_cache import DiscoveryCache, DiscoveryCacheError
 from .discovery_sources import DiscoverySourceError, OpenStreetMapDiscoverySource
@@ -56,6 +57,23 @@ def build_parser() -> argparse.ArgumentParser:
     ingest.add_argument("--file", required=True, help="JSON or JSONL candidate file")
     ingest.add_argument("--limit", type=int, default=25, help="Maximum candidates per run")
     ingest.add_argument("--dry-run", action="store_true", help="Validate without sending")
+
+    contacts = subparsers.add_parser(
+        "contacts",
+        help="Discover public contact paths for qualified leads.",
+    )
+    contacts.add_argument("--limit", type=int, default=5, help="Maximum qualified leads per run")
+    contacts.add_argument(
+        "--delay",
+        type=float,
+        default=1.0,
+        help="Delay in seconds between leads (default: 1.0)",
+    )
+    contacts.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Inspect contacts without saving them to Laravel.",
+    )
 
     queue = subparsers.add_parser(
         "analysis-queue",
@@ -228,6 +246,66 @@ def main(argv: list[str] | None = None) -> int:
                 f"duplicate={duplicate_total} failed={failed_total}"
             )
             return 1 if failed_total else 0
+
+        if args.command == "contacts":
+            queue_result = client.contact_discovery_queue(args.limit)
+            leads = queue_result.get("leads", [])
+
+            if not leads:
+                print("No qualified leads are waiting for contact discovery.")
+                return 0
+
+            finder = ContactFinder(timeout_seconds=config.timeout_seconds)
+            submitted = 0
+            failed = 0
+
+            for index, lead in enumerate(leads, start=1):
+                try:
+                    result = finder.discover(lead)
+                    contacts = result["contacts"]
+
+                    print(
+                        f"[{index}/{len(leads)}] {lead.get('business_name')} "
+                        f"contacts={len(contacts)} pages={len(result['pages_inspected'])}"
+                    )
+
+                    for contact in contacts:
+                        print(
+                            f"  - {contact['type']}: {contact['value']} "
+                            f"(source: {contact.get('source_url')})"
+                        )
+
+                    for note in result["notes"]:
+                        print(f"  note: {note}")
+
+                    if args.dry_run:
+                        print("  dry-run: contacts not saved")
+                    else:
+                        response = client.complete_contact_discovery(
+                            lead["uuid"],
+                            contacts,
+                            result["notes"],
+                        )
+                        print(
+                            f"  submitted: {response.get('contact_count', 0)} contact(s)"
+                        )
+                        submitted += 1
+
+                except (ContactDiscoveryError, WorkerApiError, ValueError) as error:
+                    failed += 1
+                    print(
+                        f"[{index}/{len(leads)}] failed: "
+                        f"{lead.get('business_name')} - {error}",
+                        file=sys.stderr,
+                    )
+
+                if index < len(leads):
+                    time.sleep(max(0.5, min(args.delay, 10.0)))
+
+            print(
+                f"Finished. inspected={len(leads)} submitted={submitted} failed={failed}"
+            )
+            return 1 if failed else 0
 
         if args.command == "analysis-queue":
             print(json.dumps(client.analysis_queue(args.limit), indent=2))

@@ -201,8 +201,9 @@ class WebsiteFetcher:
 
         except HTTPError as error:
             raise AnalyzerError(f"Website returned HTTP {error.code}.") from error
-        except URLError as error:
-            raise AnalyzerError(f"Website request failed: {error.reason}") from error
+        except (URLError, TimeoutError) as error:
+            reason = getattr(error, "reason", None) or str(error) or "request timed out"
+            raise AnalyzerError(f"Website request failed: {reason}") from error
 
 
 def _normalize(value: Any) -> str:

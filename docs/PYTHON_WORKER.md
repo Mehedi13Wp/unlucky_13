@@ -16,6 +16,8 @@ python worker/run.py ingest --campaign YOUR_CAMPAIGN_UUID --file worker/examples
 python worker/run.py analysis-queue
 python worker/run.py analyze --limit 5 --dry-run
 python worker/run.py analyze --limit 5
+python worker/run.py contacts --limit 5 --dry-run
+python worker/run.py contacts --limit 5
 python -m unittest discover -s worker/tests -v
 ```
 
@@ -61,6 +63,28 @@ UNLUCKY13_DISCOVERY_DELAY=1.1
 
 Do not commit a real token.
 
+## Public contact discovery
+
+The contact worker processes only qualified leads from active campaigns. It inspects the public business website plus at most two same-domain contact-oriented pages. It records only public contact paths found on those pages:
+
+- public email addresses
+- public telephone links
+- same-domain public contact page URLs
+
+It does not use data brokers, guess email addresses, scrape private sources, or send outreach.
+
+Preview without writing:
+
+```bash
+python worker/run.py contacts --limit 5 --dry-run
+```
+
+Store the discovered public contacts:
+
+```bash
+python worker/run.py contacts --limit 5
+```
+
 ## Next worker milestone
 
-The next milestone is contact discovery and outreach review so qualified leads can move from analysis into a human-approved outreach queue.
+The next milestone is a personalized outreach draft and Review Before Send queue.

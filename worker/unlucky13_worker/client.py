@@ -49,6 +49,25 @@ class WorkerApiClient:
         safe_limit = max(1, min(limit, 25))
         return self._request("GET", f"/api/worker/analysis/queue?limit={safe_limit}")
 
+    def contact_discovery_queue(self, limit: int = 10) -> dict[str, Any]:
+        safe_limit = max(1, min(limit, 25))
+        return self._request("GET", f"/api/worker/contact-discovery/queue?limit={safe_limit}")
+
+    def complete_contact_discovery(
+        self,
+        lead_uuid: str,
+        contacts: list[dict[str, Any]],
+        notes: list[str] | None = None,
+    ) -> dict[str, Any]:
+        return self._request(
+            "POST",
+            f"/api/worker/leads/{lead_uuid}/contacts/complete",
+            {
+                "contacts": contacts,
+                "notes": notes or [],
+            },
+        )
+
     def start_analysis(self, lead_uuid: str) -> dict[str, Any]:
         return self._request("POST", f"/api/worker/leads/{lead_uuid}/analysis/start")
 

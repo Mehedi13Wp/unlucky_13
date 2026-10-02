@@ -139,7 +139,7 @@ class LeadController extends Controller
 
     public function show(Request $request, Lead $lead): View
     {
-        $lead->load('campaign');
+        $lead->load(['campaign', 'contacts']);
 
         $this->ensureOwner($request, $lead);
 

@@ -7,6 +7,7 @@ use Database\Factories\LeadFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
 class Lead extends Model
@@ -30,6 +31,7 @@ class Lead extends Model
         'observed_signals',
         'analyzed_at',
         'qualified_at',
+        'contact_discovered_at',
         'last_contacted_at',
         'replied_at',
     ];
@@ -49,6 +51,7 @@ class Lead extends Model
             'observed_signals' => 'array',
             'analyzed_at' => 'datetime',
             'qualified_at' => 'datetime',
+            'contact_discovered_at' => 'datetime',
             'last_contacted_at' => 'datetime',
             'replied_at' => 'datetime',
         ];
@@ -62,5 +65,10 @@ class Lead extends Model
     public function campaign(): BelongsTo
     {
         return $this->belongsTo(Campaign::class);
+    }
+
+    public function contacts(): HasMany
+    {
+        return $this->hasMany(Contact::class);
     }
 }

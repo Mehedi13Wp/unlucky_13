@@ -58,4 +58,5 @@ GitHub is the source of truth. Pull before starting work and commit/push complet
 - automated website signal analyzer complete
 - active-campaign worker feed complete
 - first live permitted discovery adapter complete (OpenStreetMap/Nominatim/Overpass)
-- next product milestone: contact discovery and human-reviewed outreach queue
+- qualified-lead public contact discovery complete
+- next product milestone: personalized outreach draft and human-reviewed outreach queue

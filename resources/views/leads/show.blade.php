@@ -59,6 +59,38 @@
 
                 <p class="lead-reason">{{ $lead->qualification_reason ?: 'No qualification analysis has been recorded yet.' }}</p>
             </article>
+
+            <article class="lead-panel">
+                <header>
+                    <p class="eyebrow">Public contact discovery</p>
+                    <h3>Contact paths</h3>
+                </header>
+
+                @if ($lead->contacts->isNotEmpty())
+                    <div class="lead-detail-list">
+                        @foreach ($lead->contacts as $contact)
+                            <div>
+                                <span>{{ ucwords(str_replace('_', ' ', $contact->type)) }}</span>
+                                <strong>
+                                    @if ($contact->type === 'email')
+                                        <a href="mailto:{{ $contact->value }}">{{ $contact->value }}</a>
+                                    @elseif ($contact->type === 'phone')
+                                        <a href="tel:{{ $contact->value }}">{{ $contact->value }}</a>
+                                    @elseif ($contact->type === 'contact_page')
+                                        <a href="{{ $contact->value }}" target="_blank" rel="noopener noreferrer">Open public contact page</a>
+                                    @else
+                                        {{ $contact->value }}
+                                    @endif
+                                </strong>
+                            </div>
+                        @endforeach
+                    </div>
+                @elseif ($lead->contact_discovered_at)
+                    <p class="lead-reason">Contact discovery completed, but no public contact path was found on the inspected pages.</p>
+                @else
+                    <p class="lead-reason">Contact discovery has not run for this qualified lead yet.</p>
+                @endif
+            </article>
         </div>
 
         <aside class="lead-detail-column">
@@ -72,6 +104,7 @@
                     <div><span>Status</span><strong>{{ ucwords(str_replace('_', ' ', $lead->status->value)) }}</strong></div>
                     <div><span>Created</span><strong>{{ $lead->created_at->format('M j, Y H:i') }}</strong></div>
                     <div><span>Qualified</span><strong>{{ $lead->qualified_at?->format('M j, Y H:i') ?: 'Not yet' }}</strong></div>
+                    <div><span>Contact discovery</span><strong>{{ $lead->contact_discovered_at?->format('M j, Y H:i') ?: 'Not yet' }}</strong></div>
                     <div><span>Last contacted</span><strong>{{ $lead->last_contacted_at?->format('M j, Y H:i') ?: 'Never' }}</strong></div>
                 </div>
             </article>
