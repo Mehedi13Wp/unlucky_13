@@ -14,6 +14,7 @@ Build a professional local-first system that discovers relevant businesses, qual
 - Integrations: compliant data sources, email provider, AI provider, Telegram alerts
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for application boundaries and lifecycle details.
+See [docs/DISCOVERY_API.md](docs/DISCOVERY_API.md) and [docs/PYTHON_WORKER.md](docs/PYTHON_WORKER.md) for worker setup and API usage.
 
 ## Local development
 
@@ -52,4 +53,5 @@ GitHub is the source of truth. Pull before starting work and commit/push complet
 - professional responsive campaign workspace complete
 - lead management workspace foundation complete
 - authenticated discovery API foundation complete
-- next product milestone: Python discovery worker client and qualification pipeline
+- Python discovery worker client complete
+- next product milestone: analysis and qualification pipeline

@@ -1,0 +1,14 @@
+[
+  {
+    "business_name": "Example Restaurant",
+    "website_url": "https://www.example.com",
+    "industry": "Restaurants",
+    "country": "United States",
+    "city": "Boston",
+    "source": "manual_worker_test",
+    "source_url": "https://www.example.com",
+    "observed_signals": [
+      "Public business website available"
+    ]
+  }
+]
