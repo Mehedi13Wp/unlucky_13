@@ -99,6 +99,28 @@ class CampaignController extends Controller
             ->with('success', 'Campaign archived. Its lead history was preserved.');
     }
 
+    public function destroy(Request $request, Campaign $campaign): RedirectResponse
+    {
+        $this->ensureOwner($request, $campaign);
+
+        abort_unless(
+            $campaign->status === CampaignStatus::Archived,
+            409,
+            'Archive the campaign before permanently deleting it.',
+        );
+
+        $request->validate([
+            'delete_confirmation' => ['required', 'in:DELETE'],
+        ]);
+
+        $campaignName = $campaign->name;
+        $campaign->delete();
+
+        return redirect()
+            ->route('campaigns.index')
+            ->with('success', ""{$campaignName}" was permanently deleted.");
+    }
+
     private function ensureOwner(Request $request, Campaign $campaign): void
     {
         abort_unless($campaign->user_id === $request->user()->id, 404);
