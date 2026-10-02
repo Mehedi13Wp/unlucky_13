@@ -30,3 +30,6 @@ Thumbs.db
 __pycache__/
 *.py[cod]
 .pytest_cache/
+
+# Local worker discovery snapshots
+/storage/app/worker-cache/

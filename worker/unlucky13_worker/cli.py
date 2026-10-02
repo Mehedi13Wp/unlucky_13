@@ -8,6 +8,7 @@ import time
 from .candidates import load_candidates
 from .client import WorkerApiClient, WorkerApiError
 from .config import WorkerConfig
+from .discovery_cache import DiscoveryCache, DiscoveryCacheError
 from .discovery_sources import DiscoverySourceError, OpenStreetMapDiscoverySource
 from .website_analyzer import AnalyzerError, WebsiteAnalyzer
 
@@ -40,6 +41,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--dry-run",
         action="store_true",
         help="Discover and display candidates without ingesting them.",
+    )
+    discover.add_argument(
+        "--use-last",
+        action="store_true",
+        help="Reuse the most recent successful discovery snapshot instead of calling providers.",
     )
 
     ingest = subparsers.add_parser(
@@ -138,6 +144,7 @@ def main(argv: list[str] | None = None) -> int:
                 timeout_seconds=config.discovery_timeout_seconds,
                 delay_seconds=config.discovery_delay_seconds,
             )
+            cache = DiscoveryCache.default()
 
             discovered_total = 0
             created_total = 0
@@ -147,15 +154,45 @@ def main(argv: list[str] | None = None) -> int:
             for campaign in campaigns:
                 campaign_name = campaign.get("name") or campaign.get("uuid")
 
-                try:
-                    candidates = source.discover(campaign, limit=args.limit)
-                except DiscoverySourceError as error:
-                    failed_total += 1
-                    print(f"{campaign_name}: discovery failed - {error}", file=sys.stderr)
-                    continue
+                if args.use_last:
+                    try:
+                        snapshot = cache.load(campaign["uuid"], limit=args.limit)
+                        candidates = snapshot["candidates"]
+                    except DiscoveryCacheError as error:
+                        failed_total += 1
+                        print(
+                            f"{campaign_name}: cached discovery unavailable - {error}",
+                            file=sys.stderr,
+                        )
+                        continue
 
-                discovered_total += len(candidates)
-                print(f"{campaign_name}: discovered {len(candidates)} candidate(s)")
+                    discovered_total += len(candidates)
+                    print(
+                        f"{campaign_name}: loaded {len(candidates)} candidate(s) "
+                        f"from snapshot saved {snapshot['saved_at']}"
+                    )
+                else:
+                    try:
+                        candidates = source.discover(campaign, limit=args.limit)
+                    except DiscoverySourceError as error:
+                        failed_total += 1
+                        cache_hint = (
+                            " Use --use-last to reuse the last successful snapshot."
+                            if cache.exists(campaign["uuid"])
+                            else ""
+                        )
+                        print(
+                            f"{campaign_name}: discovery failed - {error}.{cache_hint}",
+                            file=sys.stderr,
+                        )
+                        continue
+
+                    cache.save(campaign, candidates)
+                    discovered_total += len(candidates)
+                    print(
+                        f"{campaign_name}: discovered {len(candidates)} candidate(s) "
+                        "(snapshot saved)"
+                    )
 
                 for candidate in candidates:
                     if args.dry_run:

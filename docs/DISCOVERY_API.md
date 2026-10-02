@@ -104,3 +104,21 @@ Public OpenStreetMap/Nominatim/Overpass services are shared infrastructure. Keep
 - ingestion does not send email or outreach
 - only active campaigns receive discoveries
 - source attribution is preserved
+
+
+## Discovery snapshots
+
+Every successful `discover-osm` run saves the candidates locally under the ignored
+`storage/app/worker-cache/discovery` directory. This prevents a human-reviewed dry
+run from being wasted when a public provider is temporarily unavailable on the next run.
+
+Recommended review workflow:
+
+```bash
+python worker/run.py discover-osm --limit 5 --dry-run
+python worker/run.py discover-osm --limit 5 --use-last
+```
+
+The second command reuses the exact last successful candidate snapshot and ingests it
+without calling Nominatim or Overpass again. Add `--dry-run` together with
+`--use-last` if you only want to preview the cached snapshot.
