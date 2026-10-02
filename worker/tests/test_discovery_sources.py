@@ -76,6 +76,49 @@ class OpenStreetMapDiscoverySourceTest(unittest.TestCase):
         self.assertIn('["contact:website"]', query)
         self.assertIn('["url"]', query)
 
+    def test_geocode_retries_transient_provider_timeout(self):
+        get_attempts = 0
+
+        def requester(method, url, data):
+            nonlocal get_attempts
+
+            if method == "GET":
+                get_attempts += 1
+
+                if get_attempts < 3:
+                    raise DiscoverySourceError("Could not reach discovery provider: timed out")
+
+                return [
+                    {
+                        "boundingbox": [
+                            "40.7000",
+                            "40.8000",
+                            "-74.0500",
+                            "-73.9000",
+                        ]
+                    }
+                ]
+
+            return {"elements": []}
+
+        source = OpenStreetMapDiscoverySource(
+            user_agent="Unlucky13-Test/1.0",
+            requester=requester,
+            sleeper=lambda _: None,
+        )
+
+        candidates = source.discover(
+            {
+                "target_industry": "Restaurants",
+                "target_countries": ["United States"],
+                "target_cities": ["New York"],
+            },
+            limit=5,
+        )
+
+        self.assertEqual([], candidates)
+        self.assertEqual(3, get_attempts)
+
     def test_falls_back_to_second_overpass_provider(self):
         post_urls = []
 

@@ -135,7 +135,7 @@ def main(argv: list[str] | None = None) -> int:
                 user_agent=config.discovery_user_agent,
                 nominatim_url=config.nominatim_url,
                 overpass_url=config.overpass_url,
-                timeout_seconds=config.timeout_seconds,
+                timeout_seconds=config.discovery_timeout_seconds,
                 delay_seconds=config.discovery_delay_seconds,
             )
 

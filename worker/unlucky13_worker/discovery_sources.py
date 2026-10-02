@@ -41,8 +41,9 @@ class OpenStreetMapDiscoverySource:
         user_agent: str,
         nominatim_url: str = "https://nominatim.openstreetmap.org",
         overpass_url: str = "https://overpass-api.de/api/interpreter",
-        timeout_seconds: float = 15.0,
+        timeout_seconds: float = 45.0,
         delay_seconds: float = 1.1,
+        geocode_attempts: int = 3,
         requester: JsonRequester | None = None,
         sleeper: Callable[[float], None] = time.sleep,
     ) -> None:
@@ -56,8 +57,9 @@ class OpenStreetMapDiscoverySource:
                 ]
             )
         )
-        self.timeout_seconds = timeout_seconds
+        self.timeout_seconds = max(5.0, timeout_seconds)
         self.delay_seconds = max(1.0, delay_seconds)
+        self.geocode_attempts = max(1, min(int(geocode_attempts), 5))
         self.requester = requester or self._request_json
         self.sleeper = sleeper
 
@@ -123,7 +125,27 @@ class OpenStreetMapDiscoverySource:
                 "limit": 1,
             }
         )
-        response = self.requester("GET", f"{self.nominatim_url}/search?{query}", None)
+        url = f"{self.nominatim_url}/search?{query}"
+        last_error: DiscoverySourceError | None = None
+
+        for attempt in range(1, self.geocode_attempts + 1):
+            try:
+                response = self.requester("GET", url, None)
+                break
+            except DiscoverySourceError as error:
+                last_error = error
+
+                if attempt >= self.geocode_attempts:
+                    raise DiscoverySourceError(
+                        f"Geocoding failed after {self.geocode_attempts} attempt(s) "
+                        f"for '{location_query}': {error}"
+                    ) from error
+
+                self.sleeper(self.delay_seconds * attempt)
+        else:
+            raise DiscoverySourceError(
+                f"Could not geocode target geography: {location_query}"
+            ) from last_error
 
         if not isinstance(response, list) or not response:
             raise DiscoverySourceError(f"Could not locate target geography: {location_query}")
@@ -149,8 +171,6 @@ class OpenStreetMapDiscoverySource:
     ) -> list[dict[str, Any]]:
         south, west, north, east = bbox
 
-        # Filter for website-bearing businesses at the provider so dense cities do not
-        # require downloading every POI in the selected industry.
         selector_lines = "".join(
             f'nwr["{key}"="{value}"]["{website_tag}"]({south},{west},{north},{east});'
             for key, value in selectors
