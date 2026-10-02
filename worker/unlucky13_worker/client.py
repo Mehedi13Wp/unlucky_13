@@ -42,6 +42,30 @@ class WorkerApiClient:
     def ingest_lead(self, campaign_uuid: str, candidate: dict[str, Any]) -> dict[str, Any]:
         return self._request("POST", f"/api/worker/campaigns/{campaign_uuid}/leads", candidate)
 
+    def analysis_queue(self, limit: int = 10) -> dict[str, Any]:
+        safe_limit = max(1, min(limit, 25))
+        return self._request("GET", f"/api/worker/analysis/queue?limit={safe_limit}")
+
+    def start_analysis(self, lead_uuid: str) -> dict[str, Any]:
+        return self._request("POST", f"/api/worker/leads/{lead_uuid}/analysis/start")
+
+    def complete_analysis(
+        self,
+        lead_uuid: str,
+        score: int,
+        reason: str,
+        observed_signals: list[str],
+    ) -> dict[str, Any]:
+        return self._request(
+            "POST",
+            f"/api/worker/leads/{lead_uuid}/analysis/complete",
+            {
+                "qualification_score": score,
+                "qualification_reason": reason,
+                "observed_signals": observed_signals,
+            },
+        )
+
     def _request(
         self,
         method: str,

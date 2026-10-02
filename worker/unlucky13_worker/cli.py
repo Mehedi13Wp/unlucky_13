@@ -27,6 +27,26 @@ def build_parser() -> argparse.ArgumentParser:
     ingest.add_argument("--limit", type=int, default=25, help="Maximum candidates per run")
     ingest.add_argument("--dry-run", action="store_true", help="Validate without sending")
 
+    queue = subparsers.add_parser(
+        "analysis-queue",
+        help="Show leads waiting for analysis.",
+    )
+    queue.add_argument("--limit", type=int, default=10, help="Maximum leads to return")
+
+    submit = subparsers.add_parser(
+        "analysis-submit",
+        help="Submit an auditable qualification result for one lead.",
+    )
+    submit.add_argument("--lead", required=True, help="Lead UUID")
+    submit.add_argument("--score", required=True, type=int, help="Qualification score 0-100")
+    submit.add_argument("--reason", required=True, help="Short factual qualification reason")
+    submit.add_argument(
+        "--signal",
+        action="append",
+        default=[],
+        help="Observed public signal; repeat for multiple signals",
+    )
+
     return parser
 
 
@@ -49,6 +69,21 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "health":
             print(json.dumps(client.health(), indent=2))
+            return 0
+
+        if args.command == "analysis-queue":
+            print(json.dumps(client.analysis_queue(args.limit), indent=2))
+            return 0
+
+        if args.command == "analysis-submit":
+            started = client.start_analysis(args.lead)
+            result = client.complete_analysis(
+                args.lead,
+                args.score,
+                args.reason,
+                args.signal,
+            )
+            print(json.dumps({"start": started, "result": result}, indent=2))
             return 0
 
         candidates = load_candidates(args.file)[: max(1, min(args.limit, 100))]
