@@ -35,7 +35,7 @@ GitHub is the source of truth. Pull before starting work and commit/push complet
 ## Safety defaults
 
 - Review Before Send is enabled by default
-- automatic sending is disabled by default
+- automatic sending is disabled until the delivery/suppression pipeline is implemented
 - conservative campaign-level sending limits
 - deduplication and suppression lists
 - unsubscribe, bounce, and reply handling
@@ -46,5 +46,6 @@ GitHub is the source of truth. Pull before starting work and commit/push complet
 
 - Laravel 13 application bootstrapped
 - campaign and lead domain foundation complete
-- private authentication and dashboard application shell complete
-- next milestone: campaign management
+- private authentication and dashboard shell complete
+- campaign management complete: targeting, qualification rules, limits, activation/pause/archive
+- next milestone: lead management and discovery API

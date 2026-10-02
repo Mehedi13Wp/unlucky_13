@@ -24,7 +24,9 @@
             </a>
 
             <div class="nav-section">Workspace</div>
-            <span class="nav-link disabled"><span>Campaigns</span><small>Next</small></span>
+            <a class="nav-link {{ request()->routeIs('campaigns.*') ? 'active' : '' }}" href="{{ route('campaigns.index') }}">
+                <span>Campaigns</span>
+            </a>
             <span class="nav-link disabled"><span>Leads</span><small>Next</small></span>
             <span class="nav-link disabled"><span>Review Queue</span><small>Soon</small></span>
 
@@ -54,10 +56,17 @@
                 <p class="eyebrow">Private workspace</p>
                 <h1>@yield('heading', 'Dashboard')</h1>
             </div>
-            <div class="status-pill"><span></span> Local system online</div>
+            <div class="topbar-actions">
+                @yield('topbar-actions')
+                <div class="status-pill"><span></span> Local system online</div>
+            </div>
         </header>
 
         <section class="content">
+            @if (session('success'))
+                <div class="flash-success">{{ session('success') }}</div>
+            @endif
+
             @yield('content')
         </section>
     </main>

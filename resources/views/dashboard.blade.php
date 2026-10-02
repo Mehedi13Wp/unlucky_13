@@ -3,12 +3,16 @@
 @section('title', 'Dashboard')
 @section('heading', 'Command Center')
 
+@section('topbar-actions')
+    <a class="button button-primary" href="{{ route('campaigns.create') }}">New campaign</a>
+@endsection
+
 @section('content')
     <div class="hero-card">
         <div>
             <p class="eyebrow">Unlucky 13 worker</p>
             <h2>Research carefully. Qualify first. Outreach second.</h2>
-            <p>Your review-first lead engine is ready for campaign management and worker integration.</p>
+            <p>Your review-first lead engine is ready for targeted campaign management and worker integration.</p>
         </div>
         <div class="hero-badge">
             <strong>Review Before Send</strong>
@@ -51,11 +55,11 @@
                     <p class="eyebrow">Campaigns</p>
                     <h3>Recent campaigns</h3>
                 </div>
-                <span class="muted">Latest 5</span>
+                <a class="muted" href="{{ route('campaigns.index') }}">View all</a>
             </div>
 
             @forelse ($recentCampaigns as $campaign)
-                <div class="list-row">
+                <a class="list-row" href="{{ route('campaigns.show', $campaign) }}">
                     <div>
                         <strong>{{ $campaign->name }}</strong>
                         <small>{{ $campaign->target_industry ?: 'General targeting' }}</small>
@@ -64,11 +68,11 @@
                         <span class="tag">{{ $campaign->status->value }}</span>
                         <small>{{ $campaign->leads_count }} leads</small>
                     </div>
-                </div>
+                </a>
             @empty
                 <div class="empty-state">
                     <strong>No campaigns yet</strong>
-                    <span>Campaign management is the next build milestone.</span>
+                    <span>Create a focused campaign to define what the worker should research.</span>
                 </div>
             @endforelse
         </section>
