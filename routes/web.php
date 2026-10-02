@@ -18,6 +18,8 @@ Route::middleware('auth')->group(function (): void {
 
     Route::resource('campaigns', CampaignController::class)
         ->except(['destroy']);
+    Route::delete('/campaigns/{campaign}/remove-permanently', [CampaignController::class, 'removePermanently'])
+        ->name('campaigns.remove-permanently');
     Route::patch('/campaigns/{campaign}/status', [CampaignController::class, 'updateStatus'])
         ->name('campaigns.status');
     Route::patch('/campaigns/{campaign}/archive', [CampaignController::class, 'archive'])
