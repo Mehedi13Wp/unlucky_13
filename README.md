@@ -55,4 +55,4 @@ GitHub is the source of truth. Pull before starting work and commit/push complet
 - authenticated discovery API foundation complete
 - Python discovery worker client complete
 - analysis and qualification API workflow complete
-- next product milestone: automated website signal analyzer
+- automated website signal analyzer complete\n- next product milestone: permitted discovery-source adapters

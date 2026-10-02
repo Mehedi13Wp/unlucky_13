@@ -3,10 +3,12 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 
 from .candidates import load_candidates
 from .client import WorkerApiClient, WorkerApiError
 from .config import WorkerConfig
+from .website_analyzer import AnalyzerError, WebsiteAnalyzer
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -47,6 +49,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="Observed public signal; repeat for multiple signals",
     )
 
+    analyze = subparsers.add_parser(
+        "analyze",
+        help="Inspect queued public business websites and submit qualification results.",
+    )
+    analyze.add_argument("--limit", type=int, default=5, help="Maximum queued leads per run")
+    analyze.add_argument(
+        "--delay",
+        type=float,
+        default=1.0,
+        help="Delay in seconds between website requests (default: 1.0)",
+    )
+    analyze.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Inspect and score without changing lead status.",
+    )
+
     return parser
 
 
@@ -85,6 +104,59 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(json.dumps({"start": started, "result": result}, indent=2))
             return 0
+
+        if args.command == "analyze":
+            queue_result = client.analysis_queue(args.limit)
+            leads = queue_result.get("leads", [])
+
+            if not leads:
+                print("No leads are waiting for analysis.")
+                return 0
+
+            analyzer = WebsiteAnalyzer(timeout_seconds=config.timeout_seconds)
+            completed = 0
+            failed = 0
+
+            for index, lead in enumerate(leads, start=1):
+                try:
+                    result = analyzer.analyze(lead)
+                    print(
+                        f"[{index}/{len(leads)}] {lead.get('business_name')} "
+                        f"score={result['score']} signals={len(result['signals'])}"
+                    )
+
+                    for signal in result["signals"]:
+                        print(f"  - {signal}")
+
+                    if args.dry_run:
+                        print("  dry-run: result not submitted")
+                    else:
+                        client.start_analysis(lead["uuid"])
+                        response = client.complete_analysis(
+                            lead["uuid"],
+                            result["score"],
+                            result["reason"],
+                            result["signals"],
+                        )
+                        decision = response.get("decision") or response.get("status")
+                        print(f"  submitted: {decision}")
+                        completed += 1
+
+                except (AnalyzerError, WorkerApiError, ValueError) as error:
+                    failed += 1
+                    print(
+                        f"[{index}/{len(leads)}] failed: "
+                        f"{lead.get('business_name')} - {error}",
+                        file=sys.stderr,
+                    )
+
+                if index < len(leads):
+                    time.sleep(max(0.5, min(args.delay, 10.0)))
+
+            print(
+                f"Finished. analyzed={len(leads)} submitted={completed} failed={failed}"
+            )
+            return 1 if failed else 0
 
         candidates = load_candidates(args.file)[: max(1, min(args.limit, 100))]
 
