@@ -6,6 +6,7 @@ use App\Enums\CampaignStatus;
 use App\Enums\LeadStatus;
 use App\Models\Campaign;
 use App\Models\Lead;
+use App\Models\OutreachDraft;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -135,5 +136,28 @@ class LeadManagementTest extends TestCase
             ->assertNotFound();
 
         $this->assertDatabaseMissing('leads', ['business_name' => 'Blocked Business']);
+    }
+    public function test_lead_detail_renders_pending_outreach_review_controls(): void
+    {
+        $user = User::factory()->create();
+        $campaign = Campaign::factory()->for($user)->create();
+        $lead = Lead::factory()->for($campaign)->create([
+            'status' => LeadStatus::ReadyForReview,
+        ]);
+
+        $lead->outreachDrafts()->create([
+            'channel' => 'contact_form',
+            'recipient' => 'https://example.com/contact',
+            'body' => 'Review this outreach draft.',
+            'status' => OutreachDraft::STATUS_PENDING_REVIEW,
+            'generated_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('leads.show', $lead))
+            ->assertOk()
+            ->assertSee('Review before send')
+            ->assertSee('Approve draft')
+            ->assertSee('Reject draft');
     }
 }

@@ -138,7 +138,7 @@
                         </div>
                     @endif
 
-                    @if ($latestDraft->status === AppModelsOutreachDraft::STATUS_PENDING_REVIEW)
+                    @if ($latestDraft->status === 'pending_review')
                         <div class="lead-form-footer" style="margin: 18px -19px -19px;">
                             <form method="POST" action="{{ route('outreach-drafts.reject', [$lead, $latestDraft]) }}">
                                 @csrf
@@ -152,7 +152,7 @@
                                 <button class="button button-primary" type="submit">Approve draft</button>
                             </form>
                         </div>
-                    @elseif ($latestDraft->status === AppModelsOutreachDraft::STATUS_APPROVED)
+                    @elseif ($latestDraft->status === 'approved')
                         <p class="lead-reason">Approved for the future sending pipeline. Nothing has been sent yet.</p>
                     @endif
                 @else
