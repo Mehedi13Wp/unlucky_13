@@ -8,6 +8,7 @@ import time
 from .candidates import load_candidates
 from .client import WorkerApiClient, WorkerApiError
 from .config import WorkerConfig
+from .discovery_sources import DiscoverySourceError, OpenStreetMapDiscoverySource
 from .website_analyzer import AnalyzerError, WebsiteAnalyzer
 
 
@@ -19,6 +20,27 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("health", help="Verify API authentication and connectivity.")
+    subparsers.add_parser("campaigns", help="List active campaigns available to the worker.")
+
+    discover = subparsers.add_parser(
+        "discover-osm",
+        help="Discover public business websites from OpenStreetMap for active campaigns.",
+    )
+    discover.add_argument(
+        "--campaign",
+        help="Optional campaign UUID. Without it, all active campaigns are processed.",
+    )
+    discover.add_argument(
+        "--limit",
+        type=int,
+        default=10,
+        help="Maximum discovered candidates per campaign (default: 10, max: 50).",
+    )
+    discover.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Discover and display candidates without ingesting them.",
+    )
 
     ingest = subparsers.add_parser(
         "ingest",
@@ -89,6 +111,86 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "health":
             print(json.dumps(client.health(), indent=2))
             return 0
+
+        if args.command == "campaigns":
+            print(json.dumps(client.active_campaigns(), indent=2))
+            return 0
+
+        if args.command == "discover-osm":
+            response = client.active_campaigns()
+            campaigns = response.get("campaigns", [])
+
+            if args.campaign:
+                campaigns = [
+                    campaign
+                    for campaign in campaigns
+                    if campaign.get("uuid") == args.campaign
+                ]
+
+            if not campaigns:
+                print("No matching active campaigns are available.")
+                return 0
+
+            source = OpenStreetMapDiscoverySource(
+                user_agent=config.discovery_user_agent,
+                nominatim_url=config.nominatim_url,
+                overpass_url=config.overpass_url,
+                timeout_seconds=config.timeout_seconds,
+                delay_seconds=config.discovery_delay_seconds,
+            )
+
+            discovered_total = 0
+            created_total = 0
+            duplicate_total = 0
+            failed_total = 0
+
+            for campaign in campaigns:
+                campaign_name = campaign.get("name") or campaign.get("uuid")
+
+                try:
+                    candidates = source.discover(campaign, limit=args.limit)
+                except DiscoverySourceError as error:
+                    failed_total += 1
+                    print(f"{campaign_name}: discovery failed - {error}", file=sys.stderr)
+                    continue
+
+                discovered_total += len(candidates)
+                print(f"{campaign_name}: discovered {len(candidates)} candidate(s)")
+
+                for candidate in candidates:
+                    if args.dry_run:
+                        print(
+                            "  dry-run: "
+                            f"{candidate.get('business_name')} -> {candidate.get('website_url')}"
+                        )
+                        continue
+
+                    try:
+                        result = client.ingest_lead(campaign["uuid"], candidate)
+                        status = result.get("status", "unknown")
+
+                        if status == "created":
+                            created_total += 1
+                        elif status == "duplicate":
+                            duplicate_total += 1
+
+                        print(
+                            f"  {status}: "
+                            f"{candidate.get('business_name')} -> {candidate.get('website_url')}"
+                        )
+                    except WorkerApiError as error:
+                        failed_total += 1
+                        print(
+                            f"  failed: {candidate.get('business_name')} - {error}",
+                            file=sys.stderr,
+                        )
+
+            print(
+                "Finished. "
+                f"discovered={discovered_total} created={created_total} "
+                f"duplicate={duplicate_total} failed={failed_total}"
+            )
+            return 1 if failed_total else 0
 
         if args.command == "analysis-queue":
             print(json.dumps(client.analysis_queue(args.limit), indent=2))

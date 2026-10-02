@@ -8,6 +8,9 @@ Run from the repository root.
 
 ```bash
 python worker/run.py health
+python worker/run.py campaigns
+python worker/run.py discover-osm --limit 10 --dry-run
+python worker/run.py discover-osm --limit 10
 python worker/run.py ingest --campaign YOUR_CAMPAIGN_UUID --file worker/examples/leads.sample.json --dry-run
 python worker/run.py ingest --campaign YOUR_CAMPAIGN_UUID --file worker/examples/leads.sample.json
 python worker/run.py analysis-queue
@@ -15,6 +18,16 @@ python worker/run.py analyze --limit 5 --dry-run
 python worker/run.py analyze --limit 5
 python -m unittest discover -s worker/tests -v
 ```
+
+## Discovery
+
+The first live adapter uses OpenStreetMap public business data through Nominatim and Overpass.
+
+It processes only active campaigns, requires a supported industry plus target city/country, keeps businesses with published website URLs, preserves the source URL, and uses a minimum one-second discovery delay.
+
+Initial category mappings include restaurants, cafes, salons/beauty, real estate agencies, recruitment/employment agencies, dentists, clinics, law firms, hotels, and gyms.
+
+Public OpenStreetMap services are shared infrastructure. Use low limits for personal testing and configure a descriptive user agent.
 
 ## Automated website analyzer
 
@@ -39,10 +52,15 @@ UNLUCKY13_API_URL=http://127.0.0.1:8000
 UNLUCKY13_WORKER_TOKEN=
 UNLUCKY13_WORKER_TIMEOUT=15
 UNLUCKY13_WORKER_RETRIES=3
+
+UNLUCKY13_DISCOVERY_USER_AGENT="Unlucky13-LeadWorker/0.1"
+UNLUCKY13_NOMINATIM_URL=https://nominatim.openstreetmap.org
+UNLUCKY13_OVERPASS_URL=https://overpass-api.de/api/interpreter
+UNLUCKY13_DISCOVERY_DELAY=1.1
 ```
 
 Do not commit a real token.
 
 ## Next worker milestone
 
-The next milestone is permitted discovery-source adapters so the worker can find candidate businesses, submit them through the discovery API, then pass them through this analyzer.
+The next milestone is contact discovery and outreach review so qualified leads can move from analysis into a human-approved outreach queue.

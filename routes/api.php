@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\WorkerAnalysisController;
+use App\Http\Controllers\Api\WorkerCampaignController;
 use App\Http\Controllers\Api\WorkerDiscoveryController;
 use App\Http\Middleware\RequireWorkerToken;
 use Illuminate\Support\Facades\Route;
@@ -13,6 +14,9 @@ Route::prefix('worker')
     ->group(function (): void {
         Route::get('/health', [WorkerDiscoveryController::class, 'health'])
             ->name('api.worker.health');
+
+        Route::get('/campaigns', [WorkerCampaignController::class, 'index'])
+            ->name('api.worker.campaigns.index');
 
         Route::post('/campaigns/{campaign}/leads', [WorkerDiscoveryController::class, 'store'])
             ->name('api.worker.campaigns.leads.store');

@@ -40,6 +40,33 @@ class WorkerDiscoveryApiTest extends TestCase
             ]);
     }
 
+    public function test_worker_can_list_only_active_campaigns(): void
+    {
+        $user = User::factory()->create();
+
+        $active = Campaign::factory()->for($user)->create([
+            'name' => 'Active Restaurant Campaign',
+            'status' => CampaignStatus::Active,
+            'target_industry' => 'Restaurants',
+        ]);
+
+        Campaign::factory()->for($user)->create([
+            'name' => 'Paused Campaign',
+            'status' => CampaignStatus::Paused,
+        ]);
+
+        $this->withToken($this->token)
+            ->getJson('/api/worker/campaigns')
+            ->assertOk()
+            ->assertJsonPath('count', 1)
+            ->assertJsonPath('campaigns.0.uuid', $active->uuid)
+            ->assertJsonPath('campaigns.0.name', 'Active Restaurant Campaign')
+            ->assertJsonPath('campaigns.0.status', 'active')
+            ->assertJsonMissing([
+                'name' => 'Paused Campaign',
+            ]);
+    }
+
     public function test_worker_can_ingest_lead_into_active_campaign(): void
     {
         $user = User::factory()->create();

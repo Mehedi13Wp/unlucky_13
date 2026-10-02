@@ -39,6 +39,9 @@ class WorkerApiClient:
     def health(self) -> dict[str, Any]:
         return self._request("GET", "/api/worker/health")
 
+    def active_campaigns(self) -> dict[str, Any]:
+        return self._request("GET", "/api/worker/campaigns")
+
     def ingest_lead(self, campaign_uuid: str, candidate: dict[str, Any]) -> dict[str, Any]:
         return self._request("POST", f"/api/worker/campaigns/{campaign_uuid}/leads", candidate)
 

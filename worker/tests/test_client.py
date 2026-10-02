@@ -42,6 +42,28 @@ class WorkerApiClientTest(unittest.TestCase):
         self.assertEqual("Bearer secret-token", captured["authorization"])
         self.assertEqual(15.0, captured["timeout"])
 
+    def test_active_campaigns_uses_worker_campaign_endpoint(self):
+        captured = {}
+
+        def opener(request, timeout):
+            captured["url"] = request.full_url
+            return FakeResponse({"count": 1, "campaigns": [{"uuid": "abc"}]})
+
+        client = WorkerApiClient(
+            "http://127.0.0.1:8000",
+            "secret-token",
+            opener=opener,
+            sleeper=lambda _: None,
+        )
+
+        result = client.active_campaigns()
+
+        self.assertEqual(1, result["count"])
+        self.assertEqual(
+            "http://127.0.0.1:8000/api/worker/campaigns",
+            captured["url"],
+        )
+
     def test_non_retryable_api_error_is_exposed(self):
         def opener(request, timeout):
             payload = json.dumps({"message": "Invalid token"}).encode("utf-8")
