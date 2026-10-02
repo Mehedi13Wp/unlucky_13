@@ -69,6 +69,15 @@ class ContactFinder:
         "visit",
         "reach",
     )
+    EXCLUDED_CONTACT_PATH_WORDS = (
+        "privacy",
+        "terms",
+        "accessibility",
+        "accessible",
+        "compliance",
+        "cookie",
+        "legal",
+    )
     EMAIL_PATTERN = re.compile(
         r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b",
         re.I,
@@ -98,27 +107,27 @@ class ContactFinder:
         notes: list[str] = []
         inspected_urls: list[str] = []
 
-        self._extract_from_snapshot(homepage, contacts, inspected_urls)
+        country = str(lead.get("country") or "").strip()
+        self._extract_from_snapshot(homepage, contacts, inspected_urls, country)
         contact_pages = self._contact_page_urls(homepage)
 
         for url in contact_pages[: max(0, self.max_pages - 1)]:
-            self._append_contact(
-                contacts,
-                {
-                    "type": "contact_page",
-                    "value": url,
-                    "label": "Public contact page",
-                    "source_url": homepage.final_url,
-                },
-            )
-
             try:
                 snapshot = self.fetcher.fetch(url)
             except (AnalyzerError, TimeoutError) as error:
                 notes.append(f"Could not inspect contact page {url}: {error}")
                 continue
 
-            self._extract_from_snapshot(snapshot, contacts, inspected_urls)
+            self._append_contact(
+                contacts,
+                {
+                    "type": "contact_page",
+                    "value": snapshot.final_url,
+                    "label": "Public contact page",
+                    "source_url": homepage.final_url,
+                },
+            )
+            self._extract_from_snapshot(snapshot, contacts, inspected_urls, country)
 
         direct_contacts = [
             contact
@@ -147,6 +156,7 @@ class ContactFinder:
         snapshot: WebsiteSnapshot,
         contacts: list[dict[str, str | None]],
         inspected_urls: list[str],
+        country: str = "",
     ) -> None:
         parser = _ContactParser()
         parser.feed(snapshot.html)
@@ -172,12 +182,14 @@ class ContactFinder:
 
             if lowered.startswith("tel:"):
                 phone = href.split(":", 1)[1].split("?", 1)[0].strip()
-                if phone:
+                normalized_phone = self._normalize_phone(phone, country)
+
+                if normalized_phone:
                     self._append_contact(
                         contacts,
                         {
                             "type": "phone",
-                            "value": phone,
+                            "value": normalized_phone,
                             "label": anchor or "Public phone",
                             "source_url": snapshot.final_url,
                         },
@@ -220,6 +232,9 @@ class ContactFinder:
 
             searchable = f"{parsed.path} {anchor}".lower()
 
+            if any(word in searchable for word in self.EXCLUDED_CONTACT_PATH_WORDS):
+                continue
+
             if not any(keyword in searchable for keyword in self.CONTACT_KEYWORDS):
                 continue
 
@@ -249,6 +264,30 @@ class ContactFinder:
     def _normalized_host(url: str) -> str:
         host = (urlparse(url).hostname or "").lower().rstrip(".")
         return host[4:] if host.startswith("www.") else host
+
+    @staticmethod
+    def _normalize_phone(value: str, country: str = "") -> str | None:
+        raw = value.strip()
+        if not raw:
+            return None
+
+        digits = re.sub(r"\D+", "", raw)
+        if not digits:
+            return None
+
+        normalized_country = country.strip().lower()
+
+        if normalized_country in {"united states", "usa", "us"}:
+            if len(digits) == 10:
+                return "+1" + digits
+
+            if len(digits) == 11 and digits.startswith("1"):
+                return "+" + digits
+
+        if raw.startswith("+"):
+            return "+" + digits
+
+        return digits
 
     @staticmethod
     def _valid_email(value: str) -> bool:

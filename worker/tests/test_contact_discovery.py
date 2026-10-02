@@ -38,7 +38,12 @@ class ContactFinderTest(unittest.TestCase):
             )
         )
 
-        result = finder.discover({"website_url": "https://restaurant.example"})
+        result = finder.discover(
+            {
+                "website_url": "https://restaurant.example",
+                "country": "United States",
+            }
+        )
         pairs = {(item["type"], item["value"]) for item in result["contacts"]}
 
         self.assertIn(("email", "hello@restaurant.example"), pairs)
@@ -62,6 +67,74 @@ class ContactFinderTest(unittest.TestCase):
         self.assertEqual("email", result["contacts"][0]["type"])
         self.assertEqual("bookings@restaurant.example", result["contacts"][0]["value"])
 
+    def test_us_phone_numbers_are_normalized_for_deduplication(self):
+        home = WebsiteSnapshot(
+            requested_url="https://restaurant.example",
+            final_url="https://restaurant.example",
+            status_code=200,
+            content_type="text/html",
+            html="""
+                <html><body>
+                    <a href="tel:+13474920990">Call</a>
+                    <a href="tel:3474920990">Call local</a>
+                </body></html>
+            """,
+        )
+
+        finder = ContactFinder(fetcher=FakeFetcher({"https://restaurant.example": home}))
+        result = finder.discover(
+            {
+                "website_url": "https://restaurant.example",
+                "country": "United States",
+            }
+        )
+
+        phones = [
+            item["value"]
+            for item in result["contacts"]
+            if item["type"] == "phone"
+        ]
+
+        self.assertEqual(["+13474920990"], phones)
+
+    def test_failed_or_irrelevant_contact_pages_are_not_saved(self):
+        home = WebsiteSnapshot(
+            requested_url="https://restaurant.example",
+            final_url="https://restaurant.example",
+            status_code=200,
+            content_type="text/html",
+            html="""
+                <html><body>
+                    <a href="/contact">Contact</a>
+                    <a href="/accessible-compliance.php">Accessibility Compliance</a>
+                </body></html>
+            """,
+        )
+        contact = WebsiteSnapshot(
+            requested_url="https://restaurant.example/contact",
+            final_url="https://restaurant.example/contact",
+            status_code=200,
+            content_type="text/html",
+            html="<html><body>Contact form</body></html>",
+        )
+
+        finder = ContactFinder(
+            fetcher=FakeFetcher(
+                {
+                    "https://restaurant.example": home,
+                    "https://restaurant.example/contact": contact,
+                }
+            )
+        )
+        result = finder.discover({"website_url": "https://restaurant.example"})
+
+        pages = [
+            item["value"]
+            for item in result["contacts"]
+            if item["type"] == "contact_page"
+        ]
+
+        self.assertEqual(["https://restaurant.example/contact"], pages)
 
 if __name__ == "__main__":
     unittest.main()
