@@ -12,6 +12,8 @@
 @endsection
 
 @section('content')
+    @php($latestDraft = $lead->outreachDrafts->first())
+
     <section class="lead-detail-hero">
         <div>
             <div class="lead-detail-kicker">
@@ -89,6 +91,72 @@
                     <p class="lead-reason">Contact discovery completed, but no public contact path was found on the inspected pages.</p>
                 @else
                     <p class="lead-reason">Contact discovery has not run for this qualified lead yet.</p>
+                @endif
+            </article>
+
+            <article class="lead-panel">
+                <header>
+                    <p class="eyebrow">Review before send</p>
+                    <h3>Latest outreach draft</h3>
+                </header>
+
+                @if ($latestDraft)
+                    <div class="lead-detail-list">
+                        <div>
+                            <span>Draft status</span>
+                            <strong>{{ ucwords(str_replace('_', ' ', $latestDraft->status)) }}</strong>
+                        </div>
+                        <div>
+                            <span>Channel</span>
+                            <strong>{{ $latestDraft->channel === 'contact_form' ? 'Contact form' : 'Email' }}</strong>
+                        </div>
+                        <div>
+                            <span>Recipient</span>
+                            <strong>
+                                @if ($latestDraft->channel === 'email')
+                                    {{ $latestDraft->recipient }}
+                                @else
+                                    <a href="{{ $latestDraft->recipient }}" target="_blank" rel="noopener noreferrer">Open contact form</a>
+                                @endif
+                            </strong>
+                        </div>
+                        @if ($latestDraft->subject)
+                            <div>
+                                <span>Subject</span>
+                                <strong>{{ $latestDraft->subject }}</strong>
+                            </div>
+                        @endif
+                    </div>
+
+                    <p class="lead-reason" style="white-space: pre-line;">{{ $latestDraft->body }}</p>
+
+                    @if (! empty($latestDraft->personalization_notes))
+                        <div class="signal-list">
+                            @foreach ($latestDraft->personalization_notes as $note)
+                                <span>{{ $note }}</span>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    @if ($latestDraft->status === AppModelsOutreachDraft::STATUS_PENDING_REVIEW)
+                        <div class="lead-form-footer" style="margin: 18px -19px -19px;">
+                            <form method="POST" action="{{ route('outreach-drafts.reject', [$lead, $latestDraft]) }}">
+                                @csrf
+                                @method('PATCH')
+                                <button class="button button-secondary" type="submit">Reject draft</button>
+                            </form>
+
+                            <form method="POST" action="{{ route('outreach-drafts.approve', [$lead, $latestDraft]) }}">
+                                @csrf
+                                @method('PATCH')
+                                <button class="button button-primary" type="submit">Approve draft</button>
+                            </form>
+                        </div>
+                    @elseif ($latestDraft->status === AppModelsOutreachDraft::STATUS_APPROVED)
+                        <p class="lead-reason">Approved for the future sending pipeline. Nothing has been sent yet.</p>
+                    @endif
+                @else
+                    <p class="lead-reason">No outreach draft has been generated yet.</p>
                 @endif
             </article>
         </div>

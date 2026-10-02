@@ -68,6 +68,21 @@ class WorkerApiClient:
             },
         )
 
+    def outreach_draft_queue(self, limit: int = 5) -> dict[str, Any]:
+        safe_limit = max(1, min(limit, 25))
+        return self._request("GET", f"/api/worker/outreach-drafts/queue?limit={safe_limit}")
+
+    def create_outreach_draft(
+        self,
+        lead_uuid: str,
+        draft: dict[str, Any],
+    ) -> dict[str, Any]:
+        return self._request(
+            "POST",
+            f"/api/worker/leads/{lead_uuid}/outreach-drafts",
+            draft,
+        )
+
     def start_analysis(self, lead_uuid: str) -> dict[str, Any]:
         return self._request("POST", f"/api/worker/leads/{lead_uuid}/analysis/start")
 

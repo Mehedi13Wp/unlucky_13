@@ -10,7 +10,7 @@ Build a professional local-first system that discovers relevant businesses, qual
 
 - Laravel: authentication, dashboard, campaigns, leads, outreach review, reporting, APIs
 - Python: discovery and analysis worker
-- Database: campaigns, leads, contacts, messages, suppression/history
+- Database: campaigns, leads, contacts, outreach drafts, messages, suppression/history
 - Integrations: compliant data sources, email provider, AI provider, Telegram alerts
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for application boundaries and lifecycle details.
@@ -59,4 +59,6 @@ GitHub is the source of truth. Pull before starting work and commit/push complet
 - active-campaign worker feed complete
 - first live permitted discovery adapter complete (OpenStreetMap/Nominatim/Overpass)
 - qualified-lead public contact discovery complete
-- next product milestone: personalized outreach draft and human-reviewed outreach queue
+- fact-grounded personalized outreach drafting complete
+- human Review Before Send approve/reject workflow complete
+- next product milestone: controlled delivery, suppression, and reply tracking

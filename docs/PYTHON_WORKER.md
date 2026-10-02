@@ -18,6 +18,8 @@ python worker/run.py analyze --limit 5 --dry-run
 python worker/run.py analyze --limit 5
 python worker/run.py contacts --limit 5 --dry-run
 python worker/run.py contacts --limit 5
+python worker/run.py drafts --limit 5 --dry-run
+python worker/run.py drafts --limit 5
 python -m unittest discover -s worker/tests -v
 ```
 
@@ -85,6 +87,26 @@ Store the discovered public contacts:
 python worker/run.py contacts --limit 5
 ```
 
+## Outreach drafts and review
+
+The draft worker processes qualified leads that already have a public email address or public contact-page URL. Drafts are deterministic and fact-grounded for this milestone: they use the campaign service offer plus only supported lead facts and selected observed website signals.
+
+The worker prefers a public email address. If no public email is available, it prepares copy for a public contact form. It never guesses a recipient and never sends a message.
+
+Preview drafts without changing lead state:
+
+```bash
+python worker/run.py drafts --limit 5 --dry-run
+```
+
+Create drafts for human review:
+
+```bash
+python worker/run.py drafts --limit 5
+```
+
+Created drafts move the lead to `ready_for_review`. The lead detail page lets the authenticated owner approve or reject the latest pending draft. Approval changes the lead to `approved` but still sends nothing.
+
 ## Next worker milestone
 
-The next milestone is a personalized outreach draft and Review Before Send queue.
+The next milestone is controlled email delivery with suppression, unsubscribe, bounce, and reply handling.

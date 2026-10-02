@@ -71,4 +71,9 @@ class Lead extends Model
     {
         return $this->hasMany(Contact::class);
     }
+
+    public function outreachDrafts(): HasMany
+    {
+        return $this->hasMany(OutreachDraft::class);
+    }
 }

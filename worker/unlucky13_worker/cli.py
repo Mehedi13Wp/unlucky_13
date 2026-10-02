@@ -11,6 +11,7 @@ from .contact_discovery import ContactDiscoveryError, ContactFinder
 from .config import WorkerConfig
 from .discovery_cache import DiscoveryCache, DiscoveryCacheError
 from .discovery_sources import DiscoverySourceError, OpenStreetMapDiscoverySource
+from .outreach_drafter import OutreachDraftError, OutreachDrafter
 from .website_analyzer import AnalyzerError, WebsiteAnalyzer
 
 
@@ -73,6 +74,17 @@ def build_parser() -> argparse.ArgumentParser:
         "--dry-run",
         action="store_true",
         help="Inspect contacts without saving them to Laravel.",
+    )
+
+    drafts = subparsers.add_parser(
+        "drafts",
+        help="Prepare fact-grounded outreach drafts for human review.",
+    )
+    drafts.add_argument("--limit", type=int, default=5, help="Maximum qualified leads per run")
+    drafts.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview generated drafts without saving them to Laravel.",
     )
 
     queue = subparsers.add_parser(
@@ -304,6 +316,62 @@ def main(argv: list[str] | None = None) -> int:
 
             print(
                 f"Finished. inspected={len(leads)} submitted={submitted} failed={failed}"
+            )
+            return 1 if failed else 0
+
+        if args.command == "drafts":
+            queue_result = client.outreach_draft_queue(args.limit)
+            leads = queue_result.get("leads", [])
+
+            if not leads:
+                print("No qualified leads are waiting for outreach drafting.")
+                return 0
+
+            drafter = OutreachDrafter()
+            submitted = 0
+            failed = 0
+
+            for index, lead in enumerate(leads, start=1):
+                try:
+                    draft = drafter.generate(lead)
+
+                    print(
+                        f"[{index}/{len(leads)}] {lead.get('business_name')} "
+                        f"channel={draft['channel']} recipient={draft['recipient']}"
+                    )
+
+                    if draft.get("subject"):
+                        print(f"  subject: {draft['subject']}")
+
+                    print("  body:")
+                    for line in draft["body"].splitlines():
+                        print(f"    {line}")
+
+                    for note in draft["personalization_notes"]:
+                        print(f"  note: {note}")
+
+                    if args.dry_run:
+                        print("  dry-run: draft not saved")
+                    else:
+                        response = client.create_outreach_draft(
+                            lead["uuid"],
+                            draft,
+                        )
+                        print(
+                            f"  submitted: {response.get('status', 'unknown')}"
+                        )
+                        submitted += 1
+
+                except (OutreachDraftError, WorkerApiError, ValueError) as error:
+                    failed += 1
+                    print(
+                        f"[{index}/{len(leads)}] failed: "
+                        f"{lead.get('business_name')} - {error}",
+                        file=sys.stderr,
+                    )
+
+            print(
+                f"Finished. drafted={len(leads)} submitted={submitted} failed={failed}"
             )
             return 1 if failed else 0
 

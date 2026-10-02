@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LeadController;
+use App\Http\Controllers\OutreachDraftController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function (): void {
@@ -28,6 +29,16 @@ Route::middleware('auth')->group(function (): void {
 
     Route::resource('leads', LeadController::class)
         ->only(['index', 'create', 'store', 'show']);
+
+    Route::patch(
+        '/leads/{lead}/outreach-drafts/{outreachDraft}/approve',
+        [OutreachDraftController::class, 'approve'],
+    )->name('outreach-drafts.approve');
+
+    Route::patch(
+        '/leads/{lead}/outreach-drafts/{outreachDraft}/reject',
+        [OutreachDraftController::class, 'reject'],
+    )->name('outreach-drafts.reject');
 
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 });
