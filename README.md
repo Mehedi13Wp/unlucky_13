@@ -49,5 +49,5 @@ GitHub is the source of truth. Pull before starting work and commit/push complet
 - private authentication and responsive application shell complete
 - campaign management complete
 - premium responsive dashboard complete
-- next UI milestone: campaign-page visual refinement
-- next product milestone after UI pass: lead management and discovery API
+- professional responsive campaign workspace complete
+- next product milestone: lead management and discovery API

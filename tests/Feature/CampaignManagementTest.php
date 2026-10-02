@@ -1,12 +1,12 @@
 <?php
 
-namespace Tests\Feature;
+namespace TestsFeature;
 
-use App\Enums\CampaignStatus;
-use App\Models\Campaign;
-use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
+use AppEnumsCampaignStatus;
+use AppModelsCampaign;
+use AppModelsUser;
+use IlluminateFoundationTestingRefreshDatabase;
+use TestsTestCase;
 
 class CampaignManagementTest extends TestCase
 {
@@ -28,8 +28,21 @@ class CampaignManagementTest extends TestCase
         $this->actingAs($user)
             ->get('/campaigns')
             ->assertOk()
+            ->assertSee('Campaign workspace')
             ->assertSee('My Campaign')
             ->assertDontSee('Private Other Campaign');
+    }
+
+    public function test_campaign_create_screen_renders_professional_campaign_form(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get('/campaigns/create')
+            ->assertOk()
+            ->assertSee('Create a focused target')
+            ->assertSee('Campaign principles')
+            ->assertSee('Review before send');
     }
 
     public function test_user_can_create_a_safe_draft_campaign(): void
@@ -40,7 +53,8 @@ class CampaignManagementTest extends TestCase
             'name' => 'Restaurant Booking Outreach',
             'service_offer' => 'Direct online reservation system for independent restaurants.',
             'target_industry' => 'Restaurants',
-            'target_countries' => "United States\nCanada",
+            'target_countries' => "United States
+Canada",
             'target_cities' => 'New York, Toronto',
             'minimum_score' => 65,
             'requires_website' => 1,
@@ -85,6 +99,23 @@ class CampaignManagementTest extends TestCase
         $this->assertSame('Updated Campaign', $campaign->name);
         $this->assertSame(10, $campaign->daily_outreach_limit);
         $this->assertSame(70, $campaign->qualification_rules['minimum_score']);
+    }
+
+    public function test_campaign_detail_renders_control_and_policy_information(): void
+    {
+        $user = User::factory()->create();
+        $campaign = Campaign::factory()->for($user)->create([
+            'name' => 'Professional Detail Campaign',
+            'review_required' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('campaigns.show', $campaign))
+            ->assertOk()
+            ->assertSee('Professional Detail Campaign')
+            ->assertSee('Lead policy')
+            ->assertSee('Status actions')
+            ->assertSee('Human approval required');
     }
 
     public function test_user_can_activate_and_pause_their_campaign(): void
