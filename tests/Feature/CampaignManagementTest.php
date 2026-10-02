@@ -1,12 +1,13 @@
 <?php
 
-namespace TestsFeature;
+namespace Tests\Feature;
 
-use AppEnumsCampaignStatus;
-use AppModelsCampaign;
-use AppModelsUser;
-use IlluminateFoundationTestingRefreshDatabase;
-use TestsTestCase;
+use App\Enums\CampaignStatus;
+use App\Models\Campaign;
+use App\Models\Lead;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 class CampaignManagementTest extends TestCase
 {
@@ -53,8 +54,7 @@ class CampaignManagementTest extends TestCase
             'name' => 'Restaurant Booking Outreach',
             'service_offer' => 'Direct online reservation system for independent restaurants.',
             'target_industry' => 'Restaurants',
-            'target_countries' => "United States
-Canada",
+            'target_countries' => "United States\nCanada",
             'target_cities' => 'New York, Toronto',
             'minimum_score' => 65,
             'requires_website' => 1,
@@ -149,18 +149,94 @@ Canada",
             ->assertNotFound();
     }
 
-    public function test_archiving_preserves_campaign_instead_of_deleting_it(): void
+    public function test_archiving_preserves_campaign_and_shows_delete_option(): void
     {
         $user = User::factory()->create();
         $campaign = Campaign::factory()->for($user)->create();
 
         $this->actingAs($user)
             ->patch(route('campaigns.archive', $campaign))
-            ->assertRedirect(route('campaigns.index'));
+            ->assertRedirect(route('campaigns.show', $campaign));
 
         $this->assertDatabaseHas('campaigns', [
             'id' => $campaign->id,
             'status' => CampaignStatus::Archived->value,
         ]);
+
+        $this->actingAs($user)
+            ->get(route('campaigns.show', $campaign))
+            ->assertOk()
+            ->assertSee('Delete permanently')
+            ->assertSee('Type DELETE to confirm');
+    }
+
+    public function test_non_archived_campaign_cannot_be_permanently_removed(): void
+    {
+        $user = User::factory()->create();
+        $campaign = Campaign::factory()->for($user)->create([
+            'status' => CampaignStatus::Draft,
+        ]);
+
+        $this->actingAs($user)
+            ->delete(route('campaigns.remove-permanently', $campaign), [
+                'delete_confirmation' => 'DELETE',
+            ])
+            ->assertStatus(409);
+
+        $this->assertDatabaseHas('campaigns', ['id' => $campaign->id]);
+    }
+
+    public function test_archived_campaign_requires_delete_confirmation(): void
+    {
+        $user = User::factory()->create();
+        $campaign = Campaign::factory()->for($user)->create([
+            'status' => CampaignStatus::Archived,
+        ]);
+
+        $this->actingAs($user)
+            ->from(route('campaigns.show', $campaign))
+            ->delete(route('campaigns.remove-permanently', $campaign), [
+                'delete_confirmation' => 'WRONG',
+            ])
+            ->assertRedirect(route('campaigns.show', $campaign))
+            ->assertSessionHasErrors('delete_confirmation');
+
+        $this->assertDatabaseHas('campaigns', ['id' => $campaign->id]);
+    }
+
+    public function test_user_can_permanently_remove_archived_campaign_and_its_leads(): void
+    {
+        $user = User::factory()->create();
+        $campaign = Campaign::factory()->for($user)->create([
+            'status' => CampaignStatus::Archived,
+        ]);
+        $lead = Lead::factory()->for($campaign)->create();
+
+        $this->actingAs($user)
+            ->delete(route('campaigns.remove-permanently', $campaign), [
+                'delete_confirmation' => 'DELETE',
+            ])
+            ->assertRedirect(route('campaigns.index'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseMissing('campaigns', ['id' => $campaign->id]);
+        $this->assertDatabaseMissing('leads', ['id' => $lead->id]);
+    }
+
+    public function test_user_cannot_remove_another_users_campaign(): void
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $campaign = Campaign::factory()->for($otherUser)->create([
+            'status' => CampaignStatus::Archived,
+        ]);
+
+        $this->actingAs($user)
+            ->delete(route('campaigns.remove-permanently', $campaign), [
+                'delete_confirmation' => 'DELETE',
+            ])
+            ->assertNotFound();
+
+        $this->assertDatabaseHas('campaigns', ['id' => $campaign->id]);
     }
 }
