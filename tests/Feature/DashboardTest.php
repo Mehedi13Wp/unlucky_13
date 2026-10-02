@@ -14,7 +14,7 @@ class DashboardTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_dashboard_renders_operational_counts(): void
+    public function test_dashboard_renders_operational_counts_and_pipeline(): void
     {
         $user = User::factory()->create();
 
@@ -37,8 +37,23 @@ class DashboardTest extends TestCase
             ->get('/dashboard')
             ->assertOk()
             ->assertSee('Command Center')
+            ->assertSee('Lead pipeline')
+            ->assertSee('System readiness')
             ->assertSee('Restaurant Booking Campaign')
             ->assertSee('Example Restaurant')
-            ->assertSee('Interested Restaurant');
+            ->assertSee('Interested Restaurant')
+            ->assertSee('50% qualification rate');
+    }
+
+    public function test_empty_dashboard_guides_user_to_create_first_campaign(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertSee('Build your first focused outreach campaign.')
+            ->assertSee('Create first campaign')
+            ->assertSee('Discovery not connected yet');
     }
 }

@@ -7,6 +7,7 @@
     <meta name="theme-color" content="#070a0f">
     <title>@yield('title', 'Dashboard') · Unlucky 13</title>
     <link rel="stylesheet" href="{{ asset('css/unlucky13.css') }}">
+    @stack('styles')
 </head>
 <body class="app-body">
 <div class="app-shell" id="app-shell">
@@ -63,7 +64,7 @@
             <span class="nav-link disabled" aria-disabled="true">
                 <span class="nav-link-main">
                     <span class="nav-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                        <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1 2-2V5a2 2 0 0 1 2-2h11"/></svg>
                     </span>
                     <span>Review Queue</span>
                 </span>
@@ -151,5 +152,6 @@
 </div>
 
 <script src="{{ asset('js/unlucky13.js') }}" defer></script>
+@stack('scripts')
 </body>
 </html>
