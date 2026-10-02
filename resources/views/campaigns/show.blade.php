@@ -127,7 +127,7 @@
                 </div>
 
                 <div class="campaign-action-stack">
-                    @if ($campaign->status->value !== 'active')
+                    @if (! in_array($campaign->status->value, ['active', 'archived'], true))
                         <form method="POST" action="{{ route('campaigns.status', $campaign) }}">
                             @csrf
                             @method('PATCH')
@@ -167,6 +167,31 @@
                         @csrf
                         @method('PATCH')
                         <button class="button button-danger button-full" type="submit">Archive campaign</button>
+                    </form>
+                </article>
+            @else
+                <article class="campaign-panel danger-zone">
+                    <header>
+                        <p class="eyebrow danger-eyebrow">Danger zone</p>
+                        <h3>Delete permanently</h3>
+                    </header>
+                    <p>This removes the campaign and its leads permanently. This action cannot be undone.</p>
+
+                    <form method="POST" action="{{ route('campaigns.remove-permanently', $campaign) }}" class="delete-form">
+                        @csrf
+                        @method('DELETE')
+
+                        <label class="field">
+                            <span>Type DELETE to confirm</span>
+                            <input type="text" name="delete_confirmation" required autocomplete="off" placeholder="DELETE">
+                            @error('delete_confirmation')
+                                <small class="field-error">{{ $message }}</small>
+                            @enderror
+                        </label>
+
+                        <button class="button button-danger button-full" type="submit">
+                            Permanently delete campaign
+                        </button>
                     </form>
                 </article>
             @endif
