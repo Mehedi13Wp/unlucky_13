@@ -42,6 +42,17 @@ class WorkerApiClient:
     def active_campaigns(self) -> dict[str, Any]:
         return self._request("GET", "/api/worker/campaigns")
 
+    def known_domains(self, domains: list[str]) -> dict[str, Any]:
+        clean = sorted({str(domain).strip().lower() for domain in domains if str(domain).strip()})
+        if not clean:
+            return {"count": 0, "domains": []}
+
+        return self._request(
+            "POST",
+            "/api/worker/discovery/known-domains",
+            {"domains": clean[:200]},
+        )
+
     def ingest_lead(self, campaign_uuid: str, candidate: dict[str, Any]) -> dict[str, Any]:
         return self._request("POST", f"/api/worker/campaigns/{campaign_uuid}/leads", candidate)
 

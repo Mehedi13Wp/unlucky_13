@@ -4,6 +4,7 @@ import argparse
 import json
 import sys
 import time
+from urllib.parse import urlparse
 
 from .candidates import load_candidates
 from .client import WorkerApiClient, WorkerApiError
@@ -138,6 +139,25 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _candidate_domain(candidate: dict[str, object]) -> str | None:
+    website = str(candidate.get("website_url") or "").strip()
+    if not website:
+        return None
+
+    if "://" not in website:
+        website = "https://" + website
+
+    try:
+        host = (urlparse(website).hostname or "").lower().rstrip(".")
+    except ValueError:
+        return None
+
+    if host.startswith("www."):
+        host = host[4:]
+
+    return host or None
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
@@ -190,7 +210,9 @@ def main(argv: list[str] | None = None) -> int:
             discovered_total = 0
             created_total = 0
             duplicate_total = 0
+            skipped_known_total = 0
             failed_total = 0
+            run_seen_domains: set[str] = set()
 
             for campaign in campaigns:
                 campaign_name = campaign.get("name") or campaign.get("uuid")
@@ -214,7 +236,12 @@ def main(argv: list[str] | None = None) -> int:
                     )
                 else:
                     try:
-                        candidates = source.discover(campaign, limit=args.limit)
+                        requested_limit = max(1, min(int(args.limit), 50))
+                        discovery_pool_limit = min(50, max(requested_limit, requested_limit * 5))
+                        candidates = source.discover(
+                            campaign,
+                            limit=discovery_pool_limit,
+                        )
                     except DiscoverySourceError as error:
                         failed_total += 1
                         cache_hint = (
@@ -235,7 +262,52 @@ def main(argv: list[str] | None = None) -> int:
                         "(snapshot saved)"
                     )
 
+                candidate_domains = [
+                    domain
+                    for domain in (_candidate_domain(candidate) for candidate in candidates)
+                    if domain
+                ]
+
+                try:
+                    known_response = client.known_domains(candidate_domains)
+                    known_domains = {
+                        str(domain).strip().lower()
+                        for domain in known_response.get("domains", [])
+                        if str(domain).strip()
+                    }
+                except WorkerApiError as error:
+                    failed_total += 1
+                    print(
+                        f"{campaign_name}: duplicate check failed - {error}",
+                        file=sys.stderr,
+                    )
+                    continue
+
+                fresh_candidates = []
+                requested_limit = max(1, min(int(args.limit), 50))
+
                 for candidate in candidates:
+                    domain = _candidate_domain(candidate)
+
+                    if not domain:
+                        continue
+
+                    if domain in known_domains or domain in run_seen_domains:
+                        skipped_known_total += 1
+                        continue
+
+                    run_seen_domains.add(domain)
+                    fresh_candidates.append(candidate)
+
+                    if len(fresh_candidates) >= requested_limit:
+                        break
+
+                print(
+                    f"{campaign_name}: fresh={len(fresh_candidates)} "
+                    f"known_skipped={len(candidates) - len(fresh_candidates)}"
+                )
+
+                for candidate in fresh_candidates:
                     if args.dry_run:
                         print(
                             "  dry-run: "
@@ -266,7 +338,8 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 "Finished. "
                 f"discovered={discovered_total} created={created_total} "
-                f"duplicate={duplicate_total} failed={failed_total}"
+                f"duplicate={duplicate_total} skipped_known={skipped_known_total} "
+                f"failed={failed_total}"
             )
             return 1 if failed_total else 0
 

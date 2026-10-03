@@ -128,6 +128,65 @@ class WorkerDiscoveryApiTest extends TestCase
         $this->assertSame(1, $campaign->leads()->where('domain', 'example.com')->count());
     }
 
+    public function test_worker_ingestion_is_globally_idempotent_by_domain_across_campaigns(): void
+    {
+        $user = User::factory()->create();
+
+        $firstCampaign = Campaign::factory()->for($user)->create([
+            'status' => CampaignStatus::Active,
+        ]);
+
+        $secondCampaign = Campaign::factory()->for($user)->create([
+            'status' => CampaignStatus::Active,
+        ]);
+
+        $existing = Lead::factory()->for($firstCampaign)->create([
+            'domain' => 'shared-example.com',
+            'website_url' => 'https://shared-example.com',
+        ]);
+
+        $this->withToken($this->token)
+            ->postJson('/api/worker/campaigns/'.$secondCampaign->uuid.'/leads', [
+                'business_name' => 'Same Website From Another Campaign',
+                'website_url' => 'https://www.shared-example.com/contact',
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', 'duplicate')
+            ->assertJsonPath('duplicate_scope', 'global_domain')
+            ->assertJsonPath('lead.uuid', $existing->uuid)
+            ->assertJsonPath('lead.campaign_uuid', $firstCampaign->uuid);
+
+        $this->assertSame(0, $secondCampaign->leads()->where('domain', 'shared-example.com')->count());
+
+        $this->assertDatabaseHas('discovery_domains', [
+            'domain' => 'shared-example.com',
+            'first_lead_id' => $existing->id,
+            'first_campaign_id' => $firstCampaign->id,
+        ]);
+    }
+
+    public function test_worker_can_check_known_domains_before_ingestion(): void
+    {
+        $user = User::factory()->create();
+        $campaign = Campaign::factory()->for($user)->create();
+
+        Lead::factory()->for($campaign)->create([
+            'domain' => 'known-example.com',
+            'website_url' => 'https://known-example.com',
+        ]);
+
+        $this->withToken($this->token)
+            ->postJson('/api/worker/discovery/known-domains', [
+                'domains' => [
+                    'www.known-example.com',
+                    'new-example.com',
+                ],
+            ])
+            ->assertOk()
+            ->assertJsonPath('count', 1)
+            ->assertJsonPath('domains.0', 'known-example.com');
+    }
+
     public function test_non_active_campaign_rejects_worker_discovery(): void
     {
         $user = User::factory()->create();

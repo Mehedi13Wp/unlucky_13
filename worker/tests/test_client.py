@@ -55,6 +55,30 @@ class WorkerApiClientTest(unittest.TestCase):
         self.assertEqual(1, result["count"])
         self.assertEqual("http://127.0.0.1:8000/api/worker/campaigns", captured["url"])
 
+    def test_known_domains_uses_batch_worker_endpoint(self):
+        captured = {}
+
+        def opener(request, timeout):
+            captured["url"] = request.full_url
+            captured["body"] = json.loads(request.data.decode("utf-8"))
+            return FakeResponse({"count": 1, "domains": ["example.com"]})
+
+        client = WorkerApiClient(
+            "http://127.0.0.1:8000",
+            "secret-token",
+            opener=opener,
+            sleeper=lambda _: None,
+        )
+
+        result = client.known_domains(["Example.com", "example.com", "new.test"])
+
+        self.assertEqual(1, result["count"])
+        self.assertEqual(
+            "http://127.0.0.1:8000/api/worker/discovery/known-domains",
+            captured["url"],
+        )
+        self.assertEqual(["example.com", "new.test"], captured["body"]["domains"])
+
     def test_contact_discovery_queue_uses_worker_endpoint(self):
         captured = {}
 

@@ -35,6 +35,8 @@ Initial category mappings include restaurants, cafes, salons/beauty, real estate
 
 Public OpenStreetMap services are shared infrastructure. Use low limits for personal testing and configure a descriptive user agent.
 
+Before ingesting a discovery batch, the worker checks candidate domains against the Laravel-side global discovery registry. A website already seen by any campaign is skipped before lead creation, so it is not analyzed or contacted again. The registry is persistent across worker restarts and records first/last seen timestamps.
+
 ## Automated website analyzer
 
 The analyzer is intentionally conservative:

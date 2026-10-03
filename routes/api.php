@@ -21,6 +21,9 @@ Route::prefix('worker')
         Route::get('/campaigns', [WorkerCampaignController::class, 'index'])
             ->name('api.worker.campaigns.index');
 
+        Route::post('/discovery/known-domains', [WorkerDiscoveryController::class, 'knownDomains'])
+            ->name('api.worker.discovery.known-domains');
+
         Route::post('/campaigns/{campaign}/leads', [WorkerDiscoveryController::class, 'store'])
             ->name('api.worker.campaigns.leads.store');
 
