@@ -80,6 +80,10 @@
                                         <a href="tel:{{ $contact->value }}">{{ $contact->value }}</a>
                                     @elseif ($contact->type === 'contact_page')
                                         <a href="{{ $contact->value }}" target="_blank" rel="noopener noreferrer">Open public contact page</a>
+                                    @elseif (in_array($contact->type, ['facebook', 'instagram', 'linkedin'], true))
+                                        <a href="{{ $contact->value }}" target="_blank" rel="noopener noreferrer">
+                                            Open {{ ucfirst($contact->type) }}
+                                        </a>
                                     @else
                                         {{ $contact->value }}
                                     @endif

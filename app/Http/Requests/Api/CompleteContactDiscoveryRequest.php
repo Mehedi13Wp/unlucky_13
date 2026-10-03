@@ -19,7 +19,14 @@ class CompleteContactDiscoveryRequest extends FormRequest
             'contacts.*.type' => [
                 'required',
                 'string',
-                Rule::in(['email', 'phone', 'contact_page']),
+                Rule::in([
+                    'email',
+                    'phone',
+                    'contact_page',
+                    'facebook',
+                    'instagram',
+                    'linkedin',
+                ]),
             ],
             'contacts.*.value' => ['required', 'string', 'max:2048'],
             'contacts.*.label' => ['nullable', 'string', 'max:160'],

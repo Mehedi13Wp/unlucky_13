@@ -82,6 +82,34 @@ class ContactFinder:
         r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b",
         re.I,
     )
+    SOCIAL_HOSTS = {
+        "facebook": ("facebook.com", "fb.com"),
+        "instagram": ("instagram.com",),
+        "linkedin": ("linkedin.com",),
+    }
+    EXCLUDED_SOCIAL_PATH_PREFIXES = {
+        "facebook": (
+            "/sharer",
+            "/share",
+            "/dialog",
+            "/plugins",
+            "/login",
+        ),
+        "instagram": (
+            "/p/",
+            "/reel/",
+            "/reels/",
+            "/stories/",
+            "/explore/",
+            "/accounts/",
+        ),
+        "linkedin": (
+            "/sharing/",
+            "/sharearticle",
+            "/feed/",
+            "/login",
+        ),
+    }
 
     def __init__(
         self,
@@ -142,7 +170,14 @@ class ContactFinder:
                 "No public email address or telephone link was found on the inspected pages."
             )
 
-        priority = {"email": 0, "contact_page": 1, "phone": 2}
+        priority = {
+            "email": 0,
+            "contact_page": 1,
+            "phone": 2,
+            "facebook": 3,
+            "instagram": 4,
+            "linkedin": 5,
+        }
         contacts.sort(key=lambda contact: priority.get(str(contact["type"]), 9))
 
         return {
@@ -195,6 +230,11 @@ class ContactFinder:
                         },
                     )
 
+            social = self._social_contact(href, snapshot.final_url)
+
+            if social is not None:
+                self._append_contact(contacts, social)
+
         for email in self.EMAIL_PATTERN.findall(text):
             normalized = email.strip().lower().rstrip(".,;:")
             if self._valid_email(normalized):
@@ -244,6 +284,58 @@ class ContactFinder:
                 candidates.append(normalized)
 
         return candidates
+
+    @classmethod
+    def _social_contact(
+        cls,
+        href: str,
+        source_url: str,
+    ) -> dict[str, str | None] | None:
+        raw = href.strip()
+
+        if not raw or raw.startswith(("#", "mailto:", "tel:", "javascript:")):
+            return None
+
+        absolute = urljoin(source_url, raw)
+        parsed = urlparse(absolute)
+
+        if parsed.scheme not in {"http", "https"}:
+            return None
+
+        host = (parsed.hostname or "").lower().rstrip(".")
+        if host.startswith("www."):
+            host = host[4:]
+
+        social_type: str | None = None
+
+        for candidate_type, domains in cls.SOCIAL_HOSTS.items():
+            if any(host == domain or host.endswith("." + domain) for domain in domains):
+                social_type = candidate_type
+                break
+
+        if social_type is None:
+            return None
+
+        path = parsed.path or "/"
+        lowered_path = path.lower()
+
+        if lowered_path in {"", "/"}:
+            return None
+
+        if any(
+            lowered_path.startswith(prefix)
+            for prefix in cls.EXCLUDED_SOCIAL_PATH_PREFIXES[social_type]
+        ):
+            return None
+
+        normalized = parsed._replace(query="", fragment="").geturl().rstrip("/")
+
+        return {
+            "type": social_type,
+            "value": normalized,
+            "label": f"Official {social_type.title()}",
+            "source_url": source_url,
+        }
 
     @staticmethod
     def _append_contact(

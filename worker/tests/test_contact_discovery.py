@@ -52,6 +52,45 @@ class ContactFinderTest(unittest.TestCase):
         self.assertNotIn(("contact_page", "https://outside.example/contact"), pairs)
         self.assertEqual(2, len(result["pages_inspected"]))
 
+    def test_finds_official_social_links_from_the_business_website(self):
+        home = WebsiteSnapshot(
+            requested_url="https://agency.example",
+            final_url="https://agency.example",
+            status_code=200,
+            content_type="text/html",
+            html="""
+                <html><body>
+                    <a href="https://www.facebook.com/AgencyExample">Facebook</a>
+                    <a href="https://instagram.com/agencyexample/?utm_source=site">Instagram</a>
+                    <a href="https://www.linkedin.com/company/agency-example/">LinkedIn</a>
+                    <a href="https://www.facebook.com/sharer/sharer.php?u=https://agency.example">Share</a>
+                    <a href="https://www.instagram.com/p/ABC123/">Post</a>
+                </body></html>
+            """,
+        )
+
+        finder = ContactFinder(fetcher=FakeFetcher({"https://agency.example": home}))
+        result = finder.discover({"website_url": "https://agency.example"})
+
+        pairs = {(item["type"], item["value"]) for item in result["contacts"]}
+
+        self.assertIn(("facebook", "https://www.facebook.com/AgencyExample"), pairs)
+        self.assertIn(("instagram", "https://instagram.com/agencyexample"), pairs)
+        self.assertIn(
+            ("linkedin", "https://www.linkedin.com/company/agency-example"),
+            pairs,
+        )
+        self.assertNotIn(
+            ("facebook", "https://www.facebook.com/sharer/sharer.php"),
+            pairs,
+        )
+        self.assertFalse(
+            any(
+                item["type"] == "instagram" and "/p/" in item["value"]
+                for item in result["contacts"]
+            )
+        )
+
     def test_visible_email_on_homepage_is_recorded(self):
         home = WebsiteSnapshot(
             requested_url="https://restaurant.example",

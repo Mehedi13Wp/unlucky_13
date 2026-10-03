@@ -92,6 +92,24 @@ class WorkerContactDiscoveryApiTest extends TestCase
                         'label' => 'Public contact page',
                         'source_url' => 'https://example-business.test',
                     ],
+                    [
+                        'type' => 'facebook',
+                        'value' => 'https://www.facebook.com/examplebusiness',
+                        'label' => 'Official Facebook',
+                        'source_url' => 'https://example-business.test',
+                    ],
+                    [
+                        'type' => 'instagram',
+                        'value' => 'https://www.instagram.com/examplebusiness',
+                        'label' => 'Official Instagram',
+                        'source_url' => 'https://example-business.test',
+                    ],
+                    [
+                        'type' => 'linkedin',
+                        'value' => 'https://www.linkedin.com/company/examplebusiness',
+                        'label' => 'Official Linkedin',
+                        'source_url' => 'https://example-business.test',
+                    ],
                 ],
                 'notes' => [
                     'Inspected 2 public pages on the lead website.',
@@ -101,13 +119,31 @@ class WorkerContactDiscoveryApiTest extends TestCase
         $response
             ->assertOk()
             ->assertJsonPath('status', 'completed')
-            ->assertJsonPath('contact_count', 2)
+            ->assertJsonPath('contact_count', 5)
             ->assertJsonPath('lead.status', 'qualified');
 
         $this->assertDatabaseHas('contacts', [
             'lead_id' => $lead->id,
             'type' => 'email',
             'value' => 'hello@example-business.test',
+        ]);
+
+        $this->assertDatabaseHas('contacts', [
+            'lead_id' => $lead->id,
+            'type' => 'facebook',
+            'value' => 'https://www.facebook.com/examplebusiness',
+        ]);
+
+        $this->assertDatabaseHas('contacts', [
+            'lead_id' => $lead->id,
+            'type' => 'instagram',
+            'value' => 'https://www.instagram.com/examplebusiness',
+        ]);
+
+        $this->assertDatabaseHas('contacts', [
+            'lead_id' => $lead->id,
+            'type' => 'linkedin',
+            'value' => 'https://www.linkedin.com/company/examplebusiness',
         ]);
 
         $this->assertNotNull($lead->fresh()->contact_discovered_at);
