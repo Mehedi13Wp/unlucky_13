@@ -13,7 +13,7 @@ foreach ($taskName in $taskNames) {
     }
 
     Enable-ScheduledTask -TaskName $taskName | Out-Null
-    Write-Host "$taskName: enabled"
+    Write-Host "${taskName}: enabled"
 }
 
 if ($StartNow) {

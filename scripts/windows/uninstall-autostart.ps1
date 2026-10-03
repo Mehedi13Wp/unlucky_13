@@ -5,13 +5,13 @@ foreach ($taskName in $taskNames) {
     $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
 
     if ($null -eq $task) {
-        Write-Host "$taskName: not installed"
+        Write-Host "${taskName}: not installed"
         continue
     }
 
     Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
-    Write-Host "$taskName: removed"
+    Write-Host "${taskName}: removed"
 }
 
 Write-Host ''
