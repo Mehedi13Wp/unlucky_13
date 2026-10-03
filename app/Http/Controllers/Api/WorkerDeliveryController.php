@@ -243,9 +243,16 @@ class WorkerDeliveryController extends Controller
                 'error_message' => mb_substr($error->getMessage(), 0, 2000),
             ]);
 
-            $outreachDraft->update([
-                'status' => OutreachDraft::STATUS_APPROVED,
-            ]);
+            OutreachDraft::query()
+                ->whereKey($outreachDraft->id)
+                ->update([
+                    'status' => OutreachDraft::STATUS_APPROVED,
+                ]);
+
+            $outreachDraft->setAttribute(
+                'status',
+                OutreachDraft::STATUS_APPROVED,
+            );
 
             return response()->json([
                 'status' => 'failed',

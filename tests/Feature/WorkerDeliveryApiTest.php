@@ -100,6 +100,45 @@ class WorkerDeliveryApiTest extends TestCase
         ]);
     }
 
+    public function test_failed_delivery_returns_draft_to_approved_for_controlled_retry(): void
+    {
+        config()->set('mail.default', 'smtp');
+
+        Mail::shouldReceive('raw')
+            ->once()
+            ->andThrow(new \RuntimeException('Simulated SMTP failure'));
+
+        $user = User::factory()->create();
+        $campaign = Campaign::factory()->for($user)->create([
+            'status' => CampaignStatus::Active,
+            'daily_outreach_limit' => 10,
+        ]);
+        $lead = Lead::factory()->for($campaign)->create([
+            'status' => LeadStatus::Approved,
+        ]);
+        $draft = $lead->outreachDrafts()->create([
+            'channel' => 'email',
+            'recipient' => 'hello@business.test',
+            'subject' => 'Quick website idea',
+            'body' => 'Approved body',
+            'status' => OutreachDraft::STATUS_APPROVED,
+            'reviewed_at' => now(),
+        ]);
+
+        $this->withToken($this->token)
+            ->postJson('/api/worker/outreach-drafts/'.$draft->id.'/send')
+            ->assertOk()
+            ->assertJsonPath('status', 'failed');
+
+        $this->assertSame(OutreachDraft::STATUS_APPROVED, $draft->fresh()->status);
+        $this->assertSame(LeadStatus::Approved, $lead->fresh()->status);
+        $this->assertNull($lead->fresh()->last_contacted_at);
+        $this->assertDatabaseHas('outreach_messages', [
+            'outreach_draft_id' => $draft->id,
+            'status' => OutreachMessage::STATUS_FAILED,
+        ]);
+    }
+
     public function test_suppressed_recipient_cannot_be_sent(): void
     {
         config()->set('mail.default', 'smtp');
