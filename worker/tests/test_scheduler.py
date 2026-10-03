@@ -133,6 +133,29 @@ class WorkerSchedulerTest(unittest.TestCase):
             WorkerScheduler.is_discovery_due(None, 360, now=now)
         )
 
+    def test_run_forever_reports_completed_cycle_to_runtime_callback(self):
+        stopped = {"value": False}
+        snapshots = []
+
+        scheduler = WorkerScheduler(
+            FakeClient([]),
+            command_runner=lambda args: 0,
+            sleeper=lambda _: None,
+        )
+
+        def on_cycle_complete(stats):
+            snapshots.append(stats)
+            stopped["value"] = True
+
+        scheduler.run_forever(
+            SchedulerConfig(),
+            should_stop=lambda: stopped["value"],
+            on_cycle_complete=on_cycle_complete,
+        )
+
+        self.assertEqual(1, len(snapshots))
+        self.assertEqual(0, snapshots[0]["active_campaigns"])
+
     def test_record_failure_does_not_stop_later_pipeline_work(self):
         client = FakeClient(
             [

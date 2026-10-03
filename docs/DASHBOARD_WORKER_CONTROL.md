@@ -40,3 +40,22 @@ The dashboard does not start or stop Laravel itself. This is intentional: stoppi
 ## Windows auto-start
 
 Windows Task Scheduler scripts under scripts/windows are optional. Do not install them if the preferred workflow is manual Laravel startup plus dashboard Start/Stop control.
+
+
+## Live dashboard proof
+
+The dashboard now polls a protected live-status endpoint every 10 seconds and shows:
+
+- worker heartbeat
+- last completed scheduler cycle
+- last successful campaign discovery
+- new leads today
+- analyzed leads today
+- outreach drafts generated today
+- live Businesses found, Qualified, Review queue, and Active campaign counts
+
+The managed Python worker writes heartbeat and cycle telemetry under:
+
+    storage/app/worker-runtime/worker-state.json
+
+This file is local runtime state and is not a source of business data. Campaign, lead, analysis, and draft counts still come from Laravel's database.
