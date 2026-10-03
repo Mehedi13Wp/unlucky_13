@@ -42,6 +42,12 @@ class WorkerApiClient:
     def active_campaigns(self) -> dict[str, Any]:
         return self._request("GET", "/api/worker/campaigns")
 
+    def record_campaign_run(self, campaign_uuid: str) -> dict[str, Any]:
+        return self._request(
+            "POST",
+            f"/api/worker/campaigns/{campaign_uuid}/run-complete",
+        )
+
     def known_domains(self, domains: list[str]) -> dict[str, Any]:
         clean = sorted({str(domain).strip().lower() for domain in domains if str(domain).strip()})
         if not clean:

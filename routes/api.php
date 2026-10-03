@@ -21,6 +21,9 @@ Route::prefix('worker')
         Route::get('/campaigns', [WorkerCampaignController::class, 'index'])
             ->name('api.worker.campaigns.index');
 
+        Route::post('/campaigns/{campaign}/run-complete', [WorkerCampaignController::class, 'recordRun'])
+            ->name('api.worker.campaigns.run-complete');
+
         Route::post('/discovery/known-domains', [WorkerDiscoveryController::class, 'knownDomains'])
             ->name('api.worker.discovery.known-domains');
 

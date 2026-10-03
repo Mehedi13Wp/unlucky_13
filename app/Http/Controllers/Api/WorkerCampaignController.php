@@ -44,4 +44,24 @@ class WorkerCampaignController extends Controller
             ])->values(),
         ]);
     }
+
+    public function recordRun(Campaign $campaign): JsonResponse
+    {
+        if ($campaign->status !== CampaignStatus::Active) {
+            return response()->json([
+                'message' => 'Only active campaigns can record worker runs.',
+                'code' => 'campaign_not_active',
+            ], 409);
+        }
+
+        $campaign->forceFill([
+            'last_run_at' => now(),
+        ])->save();
+
+        return response()->json([
+            'status' => 'recorded',
+            'campaign_uuid' => $campaign->uuid,
+            'last_run_at' => $campaign->last_run_at?->toISOString(),
+        ]);
+    }
 }

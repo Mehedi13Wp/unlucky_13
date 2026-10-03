@@ -13,6 +13,7 @@ from .config import WorkerConfig
 from .discovery_cache import DiscoveryCache, DiscoveryCacheError
 from .discovery_sources import DiscoverySourceError, OpenStreetMapDiscoverySource
 from .outreach_drafter import OutreachDraftError, OutreachDrafter
+from .scheduler import SchedulerConfig, WorkerScheduler
 from .website_analyzer import AnalyzerError, WebsiteAnalyzer
 
 
@@ -25,6 +26,40 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("health", help="Verify API authentication and connectivity.")
     subparsers.add_parser("campaigns", help="List active campaigns available to the worker.")
+
+    work = subparsers.add_parser(
+        "work",
+        help="Continuously process active campaigns with a persistent local scheduler.",
+    )
+    work.add_argument(
+        "--once",
+        action="store_true",
+        help="Run one scheduler cycle and exit.",
+    )
+    work.add_argument(
+        "--poll-seconds",
+        type=float,
+        default=60.0,
+        help="Seconds between scheduler cycles (default: 60, minimum: 10).",
+    )
+    work.add_argument(
+        "--discovery-interval-minutes",
+        type=int,
+        default=360,
+        help="Minimum minutes between discovery runs per campaign (default: 360).",
+    )
+    work.add_argument(
+        "--discovery-limit",
+        type=int,
+        default=10,
+        help="Fresh discovery target per due campaign (default: 10, max: 50).",
+    )
+    work.add_argument(
+        "--pipeline-limit",
+        type=int,
+        default=10,
+        help="Maximum leads processed per analysis/contact/draft queue cycle (default: 10).",
+    )
 
     discover = subparsers.add_parser(
         "discover-osm",
@@ -181,6 +216,32 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "campaigns":
             print(json.dumps(client.active_campaigns(), indent=2))
+            return 0
+
+        if args.command == "work":
+            settings = SchedulerConfig(
+                poll_seconds=args.poll_seconds,
+                discovery_interval_minutes=args.discovery_interval_minutes,
+                discovery_limit=args.discovery_limit,
+                pipeline_limit=args.pipeline_limit,
+            )
+            scheduler = WorkerScheduler(
+                client,
+                command_runner=lambda child_args: main(list(child_args)),
+            )
+
+            if args.once:
+                stats = scheduler.run_cycle(settings)
+                print(json.dumps(stats, indent=2))
+                return 1 if (
+                    stats["discovery_failed"] > 0
+                    or stats["pipeline_failed"] > 0
+                ) else 0
+
+            try:
+                scheduler.run_forever(settings)
+            except KeyboardInterrupt:
+                print("\n[scheduler] stopped by user")
             return 0
 
         if args.command == "discover-osm":
