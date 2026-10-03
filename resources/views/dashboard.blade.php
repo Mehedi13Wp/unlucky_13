@@ -57,9 +57,12 @@
             <div class="control-card-head">
                 <div>
                     <span class="control-label">Automation worker</span>
-                    <strong>{{ $runtimeTitle }}</strong>
+                    <strong id="worker-runtime-title">{{ $runtimeTitle }}</strong>
                 </div>
-                <span class="control-state {{ in_array($runtimeState, ['starting', 'running'], true) ? 'running' : 'stopped' }}">
+                <span
+                    id="worker-runtime-state"
+                    class="control-state {{ in_array($runtimeState, ['starting', 'running'], true) ? 'running' : 'stopped' }}"
+                >
                     {{ strtoupper($runtimeState) }}
                 </span>
             </div>
@@ -68,6 +71,7 @@
                 <form method="POST" action="{{ route('worker.start') }}">
                     @csrf
                     <button
+                        id="worker-start-button"
                         class="button button-worker-start"
                         type="submit"
                         @if ($workerStartDisabled) disabled @endif
@@ -79,6 +83,7 @@
                 <form method="POST" action="{{ route('worker.stop') }}">
                     @csrf
                     <button
+                        id="worker-stop-button"
                         class="button button-worker-stop"
                         type="submit"
                         @if ($workerStopDisabled) disabled @endif
@@ -96,7 +101,7 @@
 
             <div class="control-row">
                 <span>Active campaigns</span>
-                <strong>{{ number_format($stats['active_campaigns']) }}</strong>
+                <strong id="worker-active-campaigns">{{ number_format($stats['active_campaigns']) }}</strong>
             </div>
             <div class="control-row">
                 <span>Review before send</span>
@@ -106,6 +111,44 @@
                 <span>Auto-send</span>
                 <strong>Locked</strong>
             </div>
+        </div>
+    </section>
+
+    <section
+        class="worker-live-strip"
+        aria-label="Worker activity"
+        data-live-status-url="{{ route('dashboard.live-status') }}"
+        id="worker-live-strip"
+    >
+        <div class="worker-live-item">
+            <span>Heartbeat</span>
+            <strong id="worker-heartbeat">{{ $workerActivity['heartbeat_label'] }}</strong>
+            <small>Auto-check every 10 seconds</small>
+        </div>
+        <div class="worker-live-item">
+            <span>Last cycle</span>
+            <strong id="worker-last-cycle">{{ $workerActivity['last_cycle_label'] }}</strong>
+            <small>Discovery + analysis + contacts + drafts</small>
+        </div>
+        <div class="worker-live-item">
+            <span>Last discovery</span>
+            <strong id="worker-last-discovery">{{ $workerActivity['last_discovery_label'] }}</strong>
+            <small>Per-campaign discovery interval applies</small>
+        </div>
+        <div class="worker-live-item">
+            <span>New leads today</span>
+            <strong id="worker-new-leads-today">{{ number_format($workerActivity['new_leads_today']) }}</strong>
+            <small>Fresh businesses saved today</small>
+        </div>
+        <div class="worker-live-item">
+            <span>Analyzed today</span>
+            <strong id="worker-analyzed-today">{{ number_format($workerActivity['analyzed_today']) }}</strong>
+            <small>Website inspections completed</small>
+        </div>
+        <div class="worker-live-item">
+            <span>Drafts today</span>
+            <strong id="worker-drafts-today">{{ number_format($workerActivity['drafts_today']) }}</strong>
+            <small>Waiting for human review</small>
         </div>
     </section>
 
@@ -131,7 +174,7 @@
                 </span>
                 <span class="metric-label">Businesses found</span>
             </div>
-            <strong class="metric-value">{{ number_format($stats['leads']) }}</strong>
+            <strong class="metric-value" id="metric-businesses-found">{{ number_format($stats['leads']) }}</strong>
             <div class="metric-foot">
                 <span>Across your campaigns</span>
             </div>
@@ -144,7 +187,7 @@
                 </span>
                 <span class="metric-label">Qualified</span>
             </div>
-            <strong class="metric-value">{{ number_format($stats['qualified_leads']) }}</strong>
+            <strong class="metric-value" id="metric-qualified">{{ number_format($stats['qualified_leads']) }}</strong>
             <div class="metric-foot">
                 <span>{{ $rates['qualification'] }}% qualification rate</span>
             </div>
@@ -157,7 +200,7 @@
                 </span>
                 <span class="metric-label">Review queue</span>
             </div>
-            <strong class="metric-value">{{ number_format($stats['review_queue']) }}</strong>
+            <strong class="metric-value" id="metric-review-queue">{{ number_format($stats['review_queue']) }}</strong>
             <div class="metric-foot">
                 <span>Waiting for approval</span>
             </div>
@@ -343,4 +386,96 @@
             </div>
         </article>
     </section>
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const root = document.getElementById('worker-live-strip');
+
+    if (!root) {
+        return;
+    }
+
+    const url = root.dataset.liveStatusUrl;
+    const stateNode = document.getElementById('worker-runtime-state');
+    const titleNode = document.getElementById('worker-runtime-title');
+    const startButton = document.getElementById('worker-start-button');
+    const stopButton = document.getElementById('worker-stop-button');
+
+    const stateTitles = {
+        starting: 'Starting background worker',
+        running: 'Processing active campaigns',
+        stopping: 'Finishing current operation',
+        stopped: 'Stopped by you',
+        unsupported: 'Worker control unavailable',
+    };
+
+    const setText = (id, value) => {
+        const element = document.getElementById(id);
+
+        if (element && value !== undefined && value !== null) {
+            element.textContent = value;
+        }
+    };
+
+    const applySnapshot = (payload) => {
+        const worker = payload.worker || {};
+        const activity = payload.activity || {};
+        const state = worker.state || 'stopped';
+
+        if (stateNode) {
+            stateNode.textContent = state.toUpperCase();
+            stateNode.classList.toggle('running', ['starting', 'running'].includes(state));
+            stateNode.classList.toggle('stopped', !['starting', 'running'].includes(state));
+        }
+
+        if (titleNode) {
+            titleNode.textContent = stateTitles[state] || 'Worker status updated';
+        }
+
+        if (startButton) {
+            startButton.disabled = ['starting', 'running', 'stopping'].includes(state) || worker.supported === false;
+        }
+
+        if (stopButton) {
+            stopButton.disabled = !['starting', 'running'].includes(state) || worker.supported === false;
+        }
+
+        setText('worker-heartbeat', activity.heartbeat_label || 'Waiting for worker');
+        setText('worker-last-cycle', activity.last_cycle_label || 'No cycle yet');
+        setText('worker-last-discovery', activity.last_discovery_label || 'No discovery yet');
+        setText('worker-new-leads-today', activity.new_leads_today ?? 0);
+        setText('worker-analyzed-today', activity.analyzed_today ?? 0);
+        setText('worker-drafts-today', activity.drafts_today ?? 0);
+        setText('worker-active-campaigns', activity.active_campaigns ?? 0);
+        setText('metric-businesses-found', activity.businesses_found ?? 0);
+        setText('metric-qualified', activity.qualified ?? 0);
+        setText('metric-review-queue', activity.review_queue ?? 0);
+    };
+
+    const refresh = async () => {
+        try {
+            const response = await fetch(url, {
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                cache: 'no-store',
+            });
+
+            if (!response.ok) {
+                return;
+            }
+
+            applySnapshot(await response.json());
+        } catch (error) {
+            // Keep the last known dashboard state if a poll fails.
+        }
+    };
+
+    window.setInterval(refresh, 10000);
+    window.setTimeout(refresh, 1500);
+});
+</script>
+@endpush
+
 @endsection
