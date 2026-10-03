@@ -276,7 +276,7 @@ class ApprovedEmailDeliveryService
         ?OutreachMessage $outreachMessage = null,
         ?string $leadStatus = null,
     ): array {
-        return [
+        $result = [
             'status' => $status,
             'message' => $message,
             'http_status' => $httpStatus,
@@ -285,5 +285,11 @@ class ApprovedEmailDeliveryService
             'lead_uuid' => $draft->lead?->uuid,
             'lead_status' => $leadStatus,
         ];
+
+        if ($httpStatus >= 400) {
+            $result['code'] = $status;
+        }
+
+        return $result;
     }
 }
