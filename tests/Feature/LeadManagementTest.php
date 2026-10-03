@@ -7,6 +7,7 @@ use App\Enums\LeadStatus;
 use App\Models\Campaign;
 use App\Models\Lead;
 use App\Models\OutreachDraft;
+use App\Models\OutreachMessage;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -36,6 +37,41 @@ class LeadManagementTest extends TestCase
             ->assertOk()
             ->assertSee('Visible Business')
             ->assertDontSee('Hidden Business');
+    }
+
+    public function test_lead_index_shows_total_sent_email_count(): void
+    {
+        $user = User::factory()->create();
+        $campaign = Campaign::factory()->for($user)->create();
+        $lead = Lead::factory()->for($campaign)->create();
+        $draft = $lead->outreachDrafts()->create([
+            'channel' => 'email',
+            'recipient' => 'hello@business.test',
+            'subject' => 'Hello',
+            'body' => 'Approved body',
+            'status' => OutreachDraft::STATUS_SENT,
+            'generated_at' => now()->subMinute(),
+            'reviewed_at' => now()->subMinute(),
+        ]);
+
+        OutreachMessage::query()->create([
+            'outreach_draft_id' => $draft->id,
+            'lead_id' => $lead->id,
+            'campaign_id' => $campaign->id,
+            'channel' => 'email',
+            'recipient' => 'hello@business.test',
+            'subject' => 'Hello',
+            'body' => 'Approved body',
+            'status' => OutreachMessage::STATUS_SENT,
+            'attempted_at' => now()->subMinute(),
+            'sent_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('leads.index'))
+            ->assertOk()
+            ->assertSee('Emails sent')
+            ->assertSee('>1<', false);
     }
 
     public function test_user_can_create_manual_lead_with_normalized_domain(): void

@@ -23,6 +23,7 @@
             <div><span>Total</span><strong>{{ number_format($stats['total']) }}</strong></div>
             <div><span>Qualified</span><strong>{{ number_format($stats['qualified']) }}</strong></div>
             <div><span>Review</span><strong>{{ number_format($stats['review']) }}</strong></div>
+            <div><span>Emails sent</span><strong>{{ number_format($stats['emails_sent']) }}</strong></div>
             <div><span>Interested</span><strong>{{ number_format($stats['interested']) }}</strong></div>
         </div>
     </section>

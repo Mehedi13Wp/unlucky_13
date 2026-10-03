@@ -7,6 +7,7 @@ use App\Enums\LeadStatus;
 use App\Http\Requests\StoreLeadRequest;
 use App\Models\Campaign;
 use App\Models\Lead;
+use App\Models\OutreachMessage;
 use App\Services\Leads\DomainNormalizer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -71,6 +72,13 @@ class LeadController extends Controller
             'qualified' => (clone $statsQuery)->where('status', LeadStatus::Qualified->value)->count(),
             'review' => (clone $statsQuery)->where('status', LeadStatus::ReadyForReview->value)->count(),
             'interested' => (clone $statsQuery)->where('status', LeadStatus::Interested->value)->count(),
+            'emails_sent' => OutreachMessage::query()
+                ->where('status', OutreachMessage::STATUS_SENT)
+                ->whereHas(
+                    'campaign',
+                    fn ($query) => $query->where('user_id', $request->user()->id),
+                )
+                ->count(),
         ];
 
         return view('leads.index', [

@@ -34,7 +34,7 @@
 
 .lead-mini-stats {
     display: grid;
-    grid-template-columns: repeat(4, minmax(64px, 1fr));
+    grid-template-columns: repeat(5, minmax(72px, 1fr));
     gap: 7px;
 }
 
@@ -429,6 +429,7 @@
 
     .lead-mini-stats {
         width: 100%;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
     .lead-detail-grid {
