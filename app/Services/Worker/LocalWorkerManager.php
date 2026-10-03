@@ -17,6 +17,10 @@ class LocalWorkerManager
                 'state' => 'unsupported',
                 'pid' => null,
                 'message' => 'Dashboard worker control is currently configured for Windows.',
+                'heartbeat_at' => null,
+                'heartbeat_age_seconds' => null,
+                'last_cycle_at' => null,
+                'last_cycle' => [],
             ];
         }
 
@@ -27,14 +31,16 @@ class LocalWorkerManager
         }
 
         $runtimeState = (string) ($state['state'] ?? 'stopped');
-        $heartbeatAt = strtotime((string) ($state['heartbeat_at'] ?? ''));
+        $heartbeatAt = $this->timestamp($state['heartbeat_at'] ?? null);
+        $heartbeatAge = $heartbeatAt !== null ? max(0, time() - $heartbeatAt) : null;
 
         if (
             in_array($runtimeState, ['starting', 'running', 'stopping'], true)
-            && ($heartbeatAt === false || (time() - $heartbeatAt) > self::HEARTBEAT_STALE_SECONDS)
+            && ($heartbeatAge === null || $heartbeatAge > self::HEARTBEAT_STALE_SECONDS)
         ) {
             return $this->stoppedStatus(
                 'Worker heartbeat is stale. Start it again when you are ready.',
+                $state,
             );
         }
 
@@ -46,6 +52,12 @@ class LocalWorkerManager
                 ? (int) $state['pid']
                 : null,
             'message' => (string) ($state['message'] ?? 'Worker status updated.'),
+            'heartbeat_at' => $state['heartbeat_at'] ?? null,
+            'heartbeat_age_seconds' => $heartbeatAge,
+            'last_cycle_at' => $state['last_cycle_at'] ?? null,
+            'last_cycle' => is_array($state['last_cycle'] ?? null)
+                ? $state['last_cycle']
+                : [],
         ];
     }
 
@@ -116,6 +128,10 @@ class LocalWorkerManager
             'state' => 'starting',
             'pid' => null,
             'message' => 'Worker is starting in the background.',
+            'heartbeat_at' => gmdate('c'),
+            'heartbeat_age_seconds' => 0,
+            'last_cycle_at' => $status['last_cycle_at'] ?? null,
+            'last_cycle' => $status['last_cycle'] ?? [],
         ];
     }
 
@@ -144,22 +160,29 @@ class LocalWorkerManager
         ]);
 
         return [
-            'supported' => true,
+            ...$status,
             'running' => false,
             'state' => 'stopping',
-            'pid' => $status['pid'],
             'message' => 'Worker stop requested.',
         ];
     }
 
-    private function stoppedStatus(string $message = 'Worker is stopped.'): array
-    {
+    private function stoppedStatus(
+        string $message = 'Worker is stopped.',
+        array $state = [],
+    ): array {
         return [
             'supported' => true,
             'running' => false,
             'state' => 'stopped',
             'pid' => null,
             'message' => $message,
+            'heartbeat_at' => $state['heartbeat_at'] ?? null,
+            'heartbeat_age_seconds' => null,
+            'last_cycle_at' => $state['last_cycle_at'] ?? null,
+            'last_cycle' => is_array($state['last_cycle'] ?? null)
+                ? $state['last_cycle']
+                : [],
         ];
     }
 
@@ -186,9 +209,12 @@ class LocalWorkerManager
     {
         $this->ensureRuntimeDirectories();
 
+        $current = $this->readState() ?? [];
+        $current = array_merge($current, $state);
+
         file_put_contents(
             $this->statePath(),
-            json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
+            json_encode($current, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
             LOCK_EX,
         );
     }
@@ -200,6 +226,17 @@ class LocalWorkerManager
                 throw new RuntimeException("Could not create runtime directory: {$directory}");
             }
         }
+    }
+
+    private function timestamp(mixed $value): ?int
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        $timestamp = strtotime($value);
+
+        return $timestamp === false ? null : $timestamp;
     }
 
     private function statePath(): string

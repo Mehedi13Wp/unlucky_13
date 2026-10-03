@@ -5,15 +5,20 @@ namespace App\Http\Controllers;
 use App\Enums\CampaignStatus;
 use App\Enums\LeadStatus;
 use App\Models\Lead;
+use App\Services\Dashboard\DashboardActivityService;
 use App\Services\Worker\LocalWorkerManager;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request, LocalWorkerManager $workerManager): View
-    {
+    public function __invoke(
+        Request $request,
+        LocalWorkerManager $workerManager,
+        DashboardActivityService $activityService,
+    ): View {
         $workerStatus = $workerManager->status();
+        $workerActivity = $activityService->snapshot($request->user(), $workerStatus);
 
         $campaignQuery = $request->user()->campaigns();
         $leadQuery = Lead::query()->whereHas(
@@ -83,6 +88,7 @@ class DashboardController extends Controller
             'recentCampaigns',
             'recentLeads',
             'workerStatus',
+            'workerActivity',
         ));
     }
 }

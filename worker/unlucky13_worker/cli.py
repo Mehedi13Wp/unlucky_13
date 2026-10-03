@@ -260,6 +260,11 @@ def main(argv: list[str] | None = None) -> int:
                 scheduler.run_forever(
                     settings,
                     should_stop=runtime.stop_requested if runtime is not None else None,
+                    on_cycle_complete=(
+                        runtime.mark_cycle_complete
+                        if runtime is not None
+                        else None
+                    ),
                 )
             except KeyboardInterrupt:
                 print("\n[scheduler] stopped by user")

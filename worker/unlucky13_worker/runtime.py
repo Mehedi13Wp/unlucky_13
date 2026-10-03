@@ -90,6 +90,20 @@ class ManagedWorkerRuntime:
             }
         )
 
+    def mark_cycle_complete(self, stats: dict[str, int]) -> None:
+        self._write_state(
+            {
+                "last_cycle_at": self._now(),
+                "last_cycle": {
+                    "active_campaigns": int(stats.get("active_campaigns", 0)),
+                    "discovery_due": int(stats.get("discovery_due", 0)),
+                    "discovery_completed": int(stats.get("discovery_completed", 0)),
+                    "discovery_failed": int(stats.get("discovery_failed", 0)),
+                    "pipeline_failed": int(stats.get("pipeline_failed", 0)),
+                },
+            }
+        )
+
     def mark_stopped(self) -> None:
         now = self._now()
         self._write_state(
@@ -143,8 +157,20 @@ class ManagedWorkerRuntime:
         temp_path = self.state_path.with_suffix(".tmp")
 
         with self._state_lock:
+            current: dict[str, Any] = {}
+
+            if self.state_path.exists():
+                try:
+                    decoded = json.loads(self.state_path.read_text(encoding="utf-8"))
+                    if isinstance(decoded, dict):
+                        current = decoded
+                except (OSError, json.JSONDecodeError):
+                    current = {}
+
+            current.update(payload)
+
             temp_path.write_text(
-                json.dumps(payload, ensure_ascii=False),
+                json.dumps(current, ensure_ascii=False),
                 encoding="utf-8",
             )
             os.replace(temp_path, self.state_path)

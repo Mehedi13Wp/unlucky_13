@@ -150,6 +150,7 @@ class WorkerScheduler:
         config: SchedulerConfig,
         *,
         should_stop: Callable[[], bool] | None = None,
+        on_cycle_complete: Callable[[dict[str, int]], None] | None = None,
     ) -> None:
         settings = config.normalized()
         stop_requested = should_stop or (lambda: False)
@@ -177,6 +178,14 @@ class WorkerScheduler:
                     f"discovery_failed={stats['discovery_failed']} "
                     f"pipeline_failed={stats['pipeline_failed']}"
                 )
+                if on_cycle_complete is not None:
+                    try:
+                        on_cycle_complete(stats)
+                    except Exception as error:
+                        print(
+                            "[scheduler] runtime status update failed: "
+                            f"{type(error).__name__}: {error}"
+                        )
             except WorkerApiError as error:
                 print(f"[scheduler] API unavailable: {error}")
             except Exception as error:

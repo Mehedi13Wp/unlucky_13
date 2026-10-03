@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DashboardLiveStatusController;
 use App\Http\Controllers\LeadController;
 use App\Http\Controllers\OutreachDraftController;
 use App\Http\Controllers\WorkerRuntimeController;
@@ -18,6 +19,8 @@ Route::middleware('guest')->group(function (): void {
 Route::middleware('auth')->group(function (): void {
     Route::get('/', fn () => redirect()->route('dashboard'))->name('home');
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::get('/dashboard/live-status', DashboardLiveStatusController::class)
+        ->name('dashboard.live-status');
     Route::post('/worker/start', [WorkerRuntimeController::class, 'start'])->name('worker.start');
     Route::post('/worker/stop', [WorkerRuntimeController::class, 'stop'])->name('worker.stop');
 
