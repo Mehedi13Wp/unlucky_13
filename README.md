@@ -62,4 +62,6 @@ GitHub is the source of truth. Pull before starting work and commit/push complet
 - fact-grounded personalized outreach drafting complete
 - human Review Before Send approve/reject workflow complete
 - controlled approved-email delivery foundation complete with daily-limit and suppression checks
+- persistent global website deduplication complete across campaigns
+- persistent multi-campaign worker scheduler complete with pause/resume awareness and crash-safe retries
 - next product milestone: provider events, unsubscribe/bounce/reply handling, and alerts

@@ -9,6 +9,8 @@ Run from the repository root.
 ```bash
 python worker/run.py health
 python worker/run.py campaigns
+python worker/run.py work --once
+python worker/run.py work
 python worker/run.py discover-osm --limit 10 --dry-run
 python worker/run.py discover-osm --limit 10
 python worker/run.py ingest --campaign YOUR_CAMPAIGN_UUID --file worker/examples/leads.sample.json --dry-run
@@ -36,6 +38,35 @@ Initial category mappings include restaurants, cafes, salons/beauty, real estate
 Public OpenStreetMap services are shared infrastructure. Use low limits for personal testing and configure a descriptive user agent.
 
 Before ingesting a discovery batch, the worker checks candidate domains against the Laravel-side global discovery registry. A website already seen by any campaign is skipped before lead creation, so it is not analyzed or contacted again. The registry is persistent across worker restarts and records first/last seen timestamps.
+
+## Persistent scheduler
+
+The `work` command is the local always-on worker. It re-reads active campaigns every cycle, so pause/resume changes are picked up without restarting the process.
+
+Default behavior:
+
+- polls every 60 seconds
+- runs discovery for each active campaign no more than once every 6 hours
+- stores the last successful discovery time in Laravel using `campaigns.last_run_at`
+- rotates through every due active campaign
+- runs analysis, public-contact discovery, and outreach drafting queues every cycle
+- continues after an individual discovery or queue failure
+- never auto-sends approved email; delivery remains a separate explicit command
+- safely retries after crashes because global domain deduplication prevents the same website from becoming a new lead again
+
+Run one cycle for validation:
+
+    python worker/run.py work --once
+
+Run continuously:
+
+    python worker/run.py work
+
+Tune the schedule when needed:
+
+    python worker/run.py work --poll-seconds 60 --discovery-interval-minutes 360 --discovery-limit 10 --pipeline-limit 10
+
+Local automation requires the Laravel server and worker process to stay running. The Windows auto-start milestone will launch both when the PC starts. A later VPS deployment can keep the same scheduler running while the PC is off.
 
 ## Automated website analyzer
 
