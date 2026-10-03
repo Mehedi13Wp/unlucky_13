@@ -194,7 +194,7 @@ class LocalWorkerManager
             '-ExecutionPolicy',
             'Bypass',
             '-Command',
-            "$process = Get-CimInstance Win32_Process -Filter \"ProcessId = {$pid}\" -ErrorAction SilentlyContinue; if ($null -eq $process) { exit 1 }; Write-Output $process.CommandLine",
+            '$process = Get-CimInstance Win32_Process -Filter "ProcessId = '.$pid.'" -ErrorAction SilentlyContinue; if ($null -eq $process) { exit 1 }; Write-Output $process.CommandLine',
         ]);
 
         if (! $result->successful()) {
