@@ -112,6 +112,16 @@ class WorkerSchedulerTest(unittest.TestCase):
         self.assertEqual(0, stats["active_campaigns"])
         self.assertEqual([], calls)
 
+    def test_default_discovery_interval_is_thirty_minutes(self):
+        settings = SchedulerConfig().normalized()
+
+        self.assertEqual(30, settings.discovery_interval_minutes)
+
+    def test_discovery_interval_does_not_normalize_below_thirty_minutes(self):
+        settings = SchedulerConfig(discovery_interval_minutes=5).normalized()
+
+        self.assertEqual(30, settings.discovery_interval_minutes)
+
     def test_due_calculation_uses_persistent_last_run_timestamp(self):
         now = datetime(2026, 10, 3, 22, 0, tzinfo=timezone.utc)
 

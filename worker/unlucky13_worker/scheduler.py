@@ -16,7 +16,7 @@ Sleeper = Callable[[float], None]
 @dataclass(frozen=True)
 class SchedulerConfig:
     poll_seconds: float = 60.0
-    discovery_interval_minutes: int = 360
+    discovery_interval_minutes: int = 30
     discovery_limit: int = 10
     pipeline_limit: int = 10
 
@@ -24,7 +24,7 @@ class SchedulerConfig:
         return SchedulerConfig(
             poll_seconds=max(10.0, min(float(self.poll_seconds), 3600.0)),
             discovery_interval_minutes=max(
-                60,
+                30,
                 min(int(self.discovery_interval_minutes), 10080),
             ),
             discovery_limit=max(1, min(int(self.discovery_limit), 50)),

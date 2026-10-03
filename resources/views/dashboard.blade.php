@@ -133,7 +133,7 @@
         <div class="worker-live-item">
             <span>Last discovery</span>
             <strong id="worker-last-discovery">{{ $workerActivity['last_discovery_label'] }}</strong>
-            <small>Per-campaign discovery interval applies</small>
+            <small>Fresh business discovery every 30 minutes per active campaign</small>
         </div>
         <div class="worker-live-item">
             <span>New leads today</span>

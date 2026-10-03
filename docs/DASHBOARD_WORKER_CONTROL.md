@@ -72,3 +72,16 @@ The main dashboard cards are factual totals and are refreshed from Laravel every
 - Interested: leads currently marked interested
 
 The 30-second dashboard refresh is local database polling only. It does not increase public-source discovery frequency. OpenStreetMap discovery remains on the conservative per-campaign scheduler interval.
+
+
+## Discovery cadence
+
+The managed worker now uses a 30-minute discovery interval per active campaign.
+
+- If the worker stays running, each active campaign becomes eligible for fresh discovery 30 minutes after its last successful discovery.
+- If the PC or worker is stopped, no work runs in the background.
+- When the worker is started again, a campaign whose last successful discovery is already 30 minutes old is due immediately on the next scheduler cycle.
+- Missed intervals are not replayed in bulk; the worker performs one due discovery run and resets the campaign's next 30-minute window.
+- Each due discovery run still targets up to 10 fresh businesses and global domain deduplication remains active.
+
+Dashboard polling remains every 30 seconds and is separate from external discovery.

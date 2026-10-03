@@ -46,8 +46,8 @@ def build_parser() -> argparse.ArgumentParser:
     work.add_argument(
         "--discovery-interval-minutes",
         type=int,
-        default=360,
-        help="Minimum minutes between discovery runs per campaign (default: 360).",
+        default=30,
+        help="Minimum minutes between discovery runs per campaign (default: 30).",
     )
     work.add_argument(
         "--discovery-limit",
