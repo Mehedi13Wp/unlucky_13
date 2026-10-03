@@ -30,21 +30,48 @@ class DashboardActivityService
             ->whereNotNull('last_run_at')
             ->max('last_run_at');
 
+        $campaigns = $user->campaigns()->count();
+        $activeCampaigns = $user->campaigns()
+            ->where('status', CampaignStatus::Active)
+            ->count();
+        $draftCampaigns = $user->campaigns()
+            ->where('status', CampaignStatus::Draft)
+            ->count();
+        $businessesFound = (clone $leadQuery)->count();
+        $qualified = (clone $leadQuery)
+            ->whereNotNull('qualified_at')
+            ->count();
+        $reviewQueue = (clone $leadQuery)
+            ->where('status', LeadStatus::ReadyForReview)
+            ->count();
+        $interested = (clone $leadQuery)
+            ->where('status', LeadStatus::Interested)
+            ->count();
+        $contacted = (clone $leadQuery)
+            ->whereIn('status', [
+                LeadStatus::Contacted->value,
+                LeadStatus::Replied->value,
+                LeadStatus::Interested->value,
+                LeadStatus::NotInterested->value,
+                LeadStatus::Unsubscribed->value,
+                LeadStatus::Bounced->value,
+            ])
+            ->count();
+
         return [
-            'campaigns' => $user->campaigns()->count(),
-            'active_campaigns' => $user->campaigns()
-                ->where('status', CampaignStatus::Active)
-                ->count(),
-            'businesses_found' => (clone $leadQuery)->count(),
-            'qualified' => (clone $leadQuery)
-                ->whereNotNull('qualified_at')
-                ->count(),
-            'review_queue' => (clone $leadQuery)
-                ->where('status', LeadStatus::ReadyForReview)
-                ->count(),
-            'interested' => (clone $leadQuery)
-                ->where('status', LeadStatus::Interested)
-                ->count(),
+            'campaigns' => $campaigns,
+            'active_campaigns' => $activeCampaigns,
+            'draft_campaigns' => $draftCampaigns,
+            'businesses_found' => $businessesFound,
+            'qualified' => $qualified,
+            'review_queue' => $reviewQueue,
+            'interested' => $interested,
+            'qualification_rate' => $businessesFound > 0
+                ? (int) round(($qualified / $businessesFound) * 100)
+                : 0,
+            'interest_rate' => $contacted > 0
+                ? (int) round(($interested / $contacted) * 100)
+                : 0,
             'new_leads_today' => (clone $leadQuery)
                 ->where('created_at', '>=', $today)
                 ->count(),

@@ -59,3 +59,16 @@ The managed Python worker writes heartbeat and cycle telemetry under:
     storage/app/worker-runtime/worker-state.json
 
 This file is local runtime state and is not a source of business data. Campaign, lead, analysis, and draft counts still come from Laravel's database.
+
+
+## Dashboard reporting semantics
+
+The main dashboard cards are factual totals and are refreshed from Laravel every 30 seconds while the page is open.
+
+- Campaigns: total campaigns owned by the signed-in user
+- Businesses found: total unique lead records saved
+- Qualified: cumulative leads that have ever qualified (qualified_at is set), even if they later move to review/contacted/replied states
+- Review queue: leads currently waiting for human review
+- Interested: leads currently marked interested
+
+The 30-second dashboard refresh is local database polling only. It does not increase public-source discovery frequency. OpenStreetMap discovery remains on the conservative per-campaign scheduler interval.

@@ -44,7 +44,8 @@ class DashboardTest extends TestCase
             ->assertSee('Restaurant Booking Campaign')
             ->assertSee('Example Restaurant')
             ->assertSee('Interested Restaurant')
-            ->assertSee('100% qualification rate');
+            ->assertSee('Ever qualified')
+            ->assertSee('100%');
     }
 
     public function test_empty_dashboard_guides_user_to_create_first_campaign(): void

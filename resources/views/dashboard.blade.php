@@ -123,7 +123,7 @@
         <div class="worker-live-item">
             <span>Heartbeat</span>
             <strong id="worker-heartbeat">{{ $workerActivity['heartbeat_label'] }}</strong>
-            <small>Auto-check every 10 seconds</small>
+            <small>Live dashboard refresh every 30 seconds</small>
         </div>
         <div class="worker-live-item">
             <span>Last cycle</span>
@@ -160,10 +160,10 @@
                 </span>
                 <span class="metric-label">Campaigns</span>
             </div>
-            <strong class="metric-value">{{ number_format($stats['campaigns']) }}</strong>
+            <strong class="metric-value" id="metric-campaigns">{{ number_format($stats['campaigns']) }}</strong>
             <div class="metric-foot">
-                <span>{{ number_format($stats['active_campaigns']) }} active</span>
-                <span>{{ number_format($stats['draft_campaigns']) }} draft</span>
+                <span><strong id="metric-active-campaigns">{{ number_format($stats['active_campaigns']) }}</strong> active</span>
+                <span><strong id="metric-draft-campaigns">{{ number_format($stats['draft_campaigns']) }}</strong> draft</span>
             </div>
         </article>
 
@@ -189,7 +189,7 @@
             </div>
             <strong class="metric-value" id="metric-qualified">{{ number_format($stats['qualified_leads']) }}</strong>
             <div class="metric-foot">
-                <span>{{ $rates['qualification'] }}% qualification rate</span>
+                <span>Ever qualified · <strong id="metric-qualification-rate">{{ $rates['qualification'] }}%</strong> of leads</span>
             </div>
         </article>
 
@@ -213,9 +213,9 @@
                 </span>
                 <span class="metric-label">Interested</span>
             </div>
-            <strong class="metric-value">{{ number_format($stats['interested_leads']) }}</strong>
+            <strong class="metric-value" id="metric-interested">{{ number_format($stats['interested_leads']) }}</strong>
             <div class="metric-foot">
-                <span>{{ $rates['interest'] }}% of contacted leads</span>
+                <span><strong id="metric-interest-rate">{{ $rates['interest'] }}%</strong> of contacted leads</span>
             </div>
         </article>
     </section>
@@ -447,9 +447,15 @@ document.addEventListener('DOMContentLoaded', () => {
         setText('worker-analyzed-today', activity.analyzed_today ?? 0);
         setText('worker-drafts-today', activity.drafts_today ?? 0);
         setText('worker-active-campaigns', activity.active_campaigns ?? 0);
+        setText('metric-campaigns', activity.campaigns ?? 0);
+        setText('metric-active-campaigns', activity.active_campaigns ?? 0);
+        setText('metric-draft-campaigns', activity.draft_campaigns ?? 0);
         setText('metric-businesses-found', activity.businesses_found ?? 0);
         setText('metric-qualified', activity.qualified ?? 0);
+        setText('metric-qualification-rate', (activity.qualification_rate ?? 0) + '%');
         setText('metric-review-queue', activity.review_queue ?? 0);
+        setText('metric-interested', activity.interested ?? 0);
+        setText('metric-interest-rate', (activity.interest_rate ?? 0) + '%');
     };
 
     const refresh = async () => {
@@ -472,7 +478,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    window.setInterval(refresh, 10000);
+    window.setInterval(refresh, 30000);
     window.setTimeout(refresh, 1500);
 });
 </script>

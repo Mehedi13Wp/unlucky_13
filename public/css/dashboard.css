@@ -790,3 +790,172 @@ a.activity-row:hover {
         padding: 12px 14px;
     }
 }
+
+
+/* Final dashboard readability pass: keep operational text comfortably readable. */
+.hero-kicker,
+.control-label,
+.control-row,
+.worker-help,
+.text-link,
+.head-link,
+.metric-label,
+.metric-foot,
+.head-caption,
+.pipeline-row-head,
+.pipeline-row-head strong,
+.pipeline-empty strong,
+.pipeline-empty small,
+.readiness-score,
+.readiness-item strong,
+.readiness-item small,
+.activity-main strong,
+.activity-main small,
+.activity-side small,
+.rich-empty strong,
+.rich-empty p,
+.empty-status,
+.worker-live-item span,
+.worker-live-item small,
+.dashboard-main-grid .eyebrow,
+.activity-grid .eyebrow,
+.activity-grid .status-tag,
+.activity-grid .tag {
+    font-size: 15px;
+}
+
+.dashboard-hero-copy > p {
+    font-size: 17px;
+    line-height: 1.7;
+}
+
+.control-card-head strong {
+    font-size: 17px;
+}
+
+.control-state {
+    min-width: 74px;
+    min-height: 32px;
+    font-size: 15px;
+}
+
+.worker-actions .button {
+    min-height: 44px;
+    font-size: 15px;
+}
+
+.worker-help {
+    line-height: 1.6;
+}
+
+.worker-live-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.worker-live-item {
+    padding: 17px 18px;
+}
+
+.worker-live-item strong {
+    margin-top: 8px;
+    font-size: 18px;
+    white-space: normal;
+}
+
+.worker-live-item small {
+    margin-top: 7px;
+    line-height: 1.5;
+}
+
+.metric-card {
+    padding: 19px;
+}
+
+.metric-label {
+    white-space: normal;
+    line-height: 1.35;
+}
+
+.metric-value {
+    margin: 18px 0 10px;
+    font-size: 34px;
+}
+
+.metric-foot {
+    min-height: 22px;
+    line-height: 1.45;
+}
+
+.metric-foot strong {
+    color: var(--text-soft);
+    font-size: inherit;
+}
+
+.workspace-card-head h3 {
+    font-size: 18px;
+}
+
+.pipeline-row {
+    gap: 10px;
+}
+
+.pipeline-row-head {
+    line-height: 1.4;
+}
+
+.readiness-item {
+    min-height: 72px;
+}
+
+.readiness-check,
+.readiness-index {
+    width: 34px;
+    height: 34px;
+    font-size: 15px;
+}
+
+.activity-row {
+    min-height: 76px;
+}
+
+.activity-avatar {
+    width: 40px;
+    height: 40px;
+    font-size: 15px;
+}
+
+.rich-empty {
+    font-size: 15px;
+}
+
+@media (max-width: 1180px) {
+    .worker-live-strip {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 700px) {
+    .worker-live-strip {
+        grid-template-columns: 1fr;
+    }
+
+    .metric-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .dashboard-hero-copy > p {
+        font-size: 16px;
+    }
+
+    .metric-label,
+    .metric-foot,
+    .control-row,
+    .worker-help,
+    .activity-main strong,
+    .activity-main small,
+    .readiness-item strong,
+    .readiness-item small {
+        font-size: 15px;
+    }
+}
