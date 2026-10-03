@@ -20,14 +20,14 @@ function Write-JsonResult {
     param(
         [bool]$Supported,
         [bool]$Running,
-        [Nullable[int]]$Pid,
+        [Nullable[int]]$WorkerProcessId,
         [string]$Message
     )
 
     [PSCustomObject]@{
         supported = $Supported
         running = $Running
-        pid = $Pid
+        pid = $WorkerProcessId
         message = $Message
     } | ConvertTo-Json -Compress
 }
@@ -74,11 +74,11 @@ try {
             $process = Get-WorkerProcess
 
             if ($null -eq $process) {
-                Write-JsonResult -Supported $true -Running $false -Pid $null -Message 'Worker is stopped.'
+                Write-JsonResult -Supported $true -Running $false -WorkerProcessId $null -Message 'Worker is stopped.'
                 exit 0
             }
 
-            Write-JsonResult -Supported $true -Running $true -Pid ([int]$process.ProcessId) -Message 'Worker is running.'
+            Write-JsonResult -Supported $true -Running $true -WorkerProcessId ([int]$process.ProcessId) -Message 'Worker is running.'
             exit 0
         }
 
@@ -86,7 +86,7 @@ try {
             $existing = Get-WorkerProcess
 
             if ($null -ne $existing) {
-                Write-JsonResult -Supported $true -Running $true -Pid ([int]$existing.ProcessId) -Message 'Worker is already running.'
+                Write-JsonResult -Supported $true -Running $true -WorkerProcessId ([int]$existing.ProcessId) -Message 'Worker is already running.'
                 exit 0
             }
 
@@ -116,7 +116,7 @@ try {
                 throw "Worker exited immediately. Check $stderrLog"
             }
 
-            Write-JsonResult -Supported $true -Running $true -Pid ([int]$started.ProcessId) -Message 'Worker started.'
+            Write-JsonResult -Supported $true -Running $true -WorkerProcessId ([int]$started.ProcessId) -Message 'Worker started.'
             exit 0
         }
 
@@ -124,19 +124,19 @@ try {
             $process = Get-WorkerProcess
 
             if ($null -eq $process) {
-                Write-JsonResult -Supported $true -Running $false -Pid $null -Message 'Worker is already stopped.'
+                Write-JsonResult -Supported $true -Running $false -WorkerProcessId $null -Message 'Worker is already stopped.'
                 exit 0
             }
 
             Stop-Process -Id ([int]$process.ProcessId) -Force -ErrorAction Stop
             Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
 
-            Write-JsonResult -Supported $true -Running $false -Pid $null -Message 'Worker stopped.'
+            Write-JsonResult -Supported $true -Running $false -WorkerProcessId $null -Message 'Worker stopped.'
             exit 0
         }
     }
 }
 catch {
-    Write-JsonResult -Supported $true -Running $false -Pid $null -Message $_.Exception.Message
+    Write-JsonResult -Supported $true -Running $false -WorkerProcessId $null -Message $_.Exception.Message
     exit 1
 }
