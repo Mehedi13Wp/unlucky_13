@@ -67,6 +67,39 @@ class WorkerDiscoveryApiTest extends TestCase
             ]);
     }
 
+    public function test_worker_can_record_successful_run_for_active_campaign(): void
+    {
+        $user = User::factory()->create();
+        $campaign = Campaign::factory()->for($user)->create([
+            'status' => CampaignStatus::Active,
+            'last_run_at' => null,
+        ]);
+
+        $this->withToken($this->token)
+            ->postJson('/api/worker/campaigns/'.$campaign->uuid.'/run-complete')
+            ->assertOk()
+            ->assertJsonPath('status', 'recorded')
+            ->assertJsonPath('campaign_uuid', $campaign->uuid);
+
+        $this->assertNotNull($campaign->fresh()->last_run_at);
+    }
+
+    public function test_paused_campaign_cannot_record_worker_run(): void
+    {
+        $user = User::factory()->create();
+        $campaign = Campaign::factory()->for($user)->create([
+            'status' => CampaignStatus::Paused,
+            'last_run_at' => null,
+        ]);
+
+        $this->withToken($this->token)
+            ->postJson('/api/worker/campaigns/'.$campaign->uuid.'/run-complete')
+            ->assertStatus(409)
+            ->assertJsonPath('code', 'campaign_not_active');
+
+        $this->assertNull($campaign->fresh()->last_run_at);
+    }
+
     public function test_worker_can_ingest_lead_into_active_campaign(): void
     {
         $user = User::factory()->create();
