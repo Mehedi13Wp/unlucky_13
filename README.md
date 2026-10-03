@@ -64,5 +64,6 @@ GitHub is the source of truth. Pull before starting work and commit/push complet
 - controlled approved-email delivery foundation complete with daily-limit and suppression checks
 - persistent global website deduplication complete across campaigns
 - persistent multi-campaign worker scheduler complete with pause/resume awareness and crash-safe retries
-- Windows logon auto-start, runner restart, status, enable/disable, and uninstall controls complete
+- dashboard Start/Stop control for the local Windows automation worker complete
+- optional Windows logon auto-start scripts remain available but are not required
 - next product milestone: provider events, unsubscribe/bounce/reply handling, and alerts

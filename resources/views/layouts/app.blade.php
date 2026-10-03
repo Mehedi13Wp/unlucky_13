@@ -143,6 +143,12 @@
                         <span>{{ session('success') }}</span>
                     </div>
                 @endif
+                @if (session('error'))
+                    <div class="flash-success" role="alert">
+                        <span class="flash-icon">!</span>
+                        <span>{{ session('error') }}</span>
+                    </div>
+                @endif
 
                 @yield('content')
             </section>

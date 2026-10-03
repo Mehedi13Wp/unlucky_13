@@ -42,25 +42,55 @@
         <div class="hero-control-card">
             <div class="control-card-head">
                 <div>
-                    <span class="control-label">Outreach control</span>
-                    <strong>Review before send</strong>
+                    <span class="control-label">Automation worker</span>
+                    <strong>{{ $workerStatus['running'] ? 'Processing active campaigns' : 'Stopped by you' }}</strong>
                 </div>
-                <span class="control-state">ON</span>
+                <span class="control-state {{ $workerStatus['running'] ? 'running' : 'stopped' }}">
+                    {{ $workerStatus['running'] ? 'RUNNING' : 'STOPPED' }}
+                </span>
             </div>
+
+            <div class="worker-actions">
+                <form method="POST" action="{{ route('worker.start') }}">
+                    @csrf
+                    <button
+                        class="button button-worker-start"
+                        type="submit"
+                        @disabled($workerStatus['running'] || ! $workerStatus['supported'])
+                    >
+                        Start Worker
+                    </button>
+                </form>
+
+                <form method="POST" action="{{ route('worker.stop') }}">
+                    @csrf
+                    <button
+                        class="button button-worker-stop"
+                        type="submit"
+                        @disabled(! $workerStatus['running'] || ! $workerStatus['supported'])
+                    >
+                        Stop Worker
+                    </button>
+                </form>
+            </div>
+
+            <p class="worker-help">
+                Laravel stays under your control. Start the server, open this dashboard, then start or stop automation here.
+            </p>
 
             <div class="control-divider"></div>
 
-            <div class="control-row">
-                <span>Auto-send</span>
-                <strong>Locked</strong>
-            </div>
             <div class="control-row">
                 <span>Active campaigns</span>
                 <strong>{{ number_format($stats['active_campaigns']) }}</strong>
             </div>
             <div class="control-row">
-                <span>Needs attention</span>
-                <strong>{{ number_format($stats['interested_leads']) }}</strong>
+                <span>Review before send</span>
+                <strong>ON</strong>
+            </div>
+            <div class="control-row">
+                <span>Auto-send</span>
+                <strong>Locked</strong>
             </div>
         </div>
     </section>

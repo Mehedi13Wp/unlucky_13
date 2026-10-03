@@ -5,6 +5,7 @@ use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LeadController;
 use App\Http\Controllers\OutreachDraftController;
+use App\Http\Controllers\WorkerRuntimeController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function (): void {
@@ -17,6 +18,8 @@ Route::middleware('guest')->group(function (): void {
 Route::middleware('auth')->group(function (): void {
     Route::get('/', fn () => redirect()->route('dashboard'))->name('home');
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::post('/worker/start', [WorkerRuntimeController::class, 'start'])->name('worker.start');
+    Route::post('/worker/stop', [WorkerRuntimeController::class, 'stop'])->name('worker.stop');
 
     Route::resource('campaigns', CampaignController::class)
         ->except(['destroy']);
