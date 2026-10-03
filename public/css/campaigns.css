@@ -839,3 +839,51 @@
     border-color: rgba(240, 68, 85, .68);
     box-shadow: 0 0 0 3px rgba(240, 68, 85, .1);
 }
+
+
+/* Campaign discovery/control pages: keep labels and supporting copy readable. */
+.campaign-hero p:not(.eyebrow),
+.campaign-form-hero p:not(.eyebrow),
+.campaign-detail-hero p,
+.campaign-card-body > p,
+.campaign-empty > p:not(.eyebrow),
+.campaign-section-head p:not(.eyebrow),
+.campaign-toggle small,
+.aside-rule small,
+.detail-policy-card small,
+.campaign-metric-grid small {
+    font-size: 15px;
+}
+
+.mini-stat span,
+.campaign-toolbar span,
+.campaign-card-title small,
+.campaign-meta-grid span,
+.campaign-card-foot,
+.campaign-card-foot strong,
+.form-progress span,
+.section-index,
+.aside-rule > span,
+.detail-kicker,
+.detail-policy-card span,
+.campaign-metric-grid span {
+    font-size: 15px;
+}
+
+.campaign-toolbar strong,
+.campaign-card-title strong,
+.campaign-meta-grid strong,
+.campaign-toggle strong,
+.aside-rule strong,
+.detail-policy-card strong {
+    font-size: 16px;
+}
+
+.campaign-initial {
+    font-size: 15px;
+}
+
+.campaign-section-head h3,
+.aside-card h3 {
+    font-size: 18px;
+}

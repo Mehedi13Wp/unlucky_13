@@ -1567,3 +1567,59 @@ a.list-row:hover {
         animation-iteration-count: 1 !important;
     }
 }
+
+
+/* Professional readability pass for the authenticated workspace. */
+.app-body {
+    font-size: 16px;
+}
+
+.app-body .brand-copy strong,
+.app-body .nav-link-main > span:last-child,
+.app-body .user-meta strong,
+.app-body .status-pill,
+.app-body .button,
+.app-body .button-small,
+.app-body .flash-success,
+.app-body .muted,
+.app-body .list-row strong,
+.app-body .list-row small,
+.app-body .empty-state strong,
+.app-body .empty-state span,
+.app-body .page-intro p:not(.eyebrow),
+.app-body .form-section-head p,
+.app-body .field > span,
+.app-body .field small,
+.app-body .toggle-card strong,
+.app-body .toggle-card small,
+.app-body .detail-card p,
+.app-body .detail-item span,
+.app-body .detail-item strong {
+    font-size: 15px;
+}
+
+.app-body .brand-copy small,
+.app-body .nav-section,
+.app-body .nav-link small,
+.app-body .user-meta small,
+.app-body .eyebrow,
+.app-body .tag,
+.app-body .status-tag {
+    font-size: 15px;
+}
+
+.app-body .field input,
+.app-body .field textarea,
+.app-body .field select {
+    font-size: 16px;
+}
+
+.app-body .panel-head h3,
+.app-body .detail-card h3,
+.app-body .form-section-head h3 {
+    font-size: 18px;
+}
+
+.app-body .topbar-actions .button {
+    font-size: 15px;
+}

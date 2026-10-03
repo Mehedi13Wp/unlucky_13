@@ -487,3 +487,58 @@
         text-align: center;
     }
 }
+
+
+/* Leads, discovery and review pages: minimum readable operational type. */
+.leads-hero p:not(.eyebrow),
+.lead-form-hero p:not(.eyebrow),
+.lead-detail-hero p {
+    font-size: 16px;
+}
+
+.lead-mini-stats span,
+.lead-filters label > span,
+.lead-table-head span,
+.lead-business small,
+.lead-score,
+.lead-label,
+.lead-empty p,
+.lead-pagination,
+.lead-detail-kicker,
+.lead-score-card span,
+.lead-score-card small,
+.lead-detail-list span,
+.signal-list span {
+    font-size: 15px;
+}
+
+.lead-table-head strong,
+.lead-business strong,
+.lead-row > div > strong,
+.lead-empty strong,
+.lead-detail-list strong,
+.lead-detail-list a {
+    font-size: 16px;
+}
+
+.lead-filters input,
+.lead-filters select {
+    font-size: 16px;
+}
+
+.lead-score-card strong {
+    font-size: 24px;
+}
+
+.lead-panel header h3 {
+    font-size: 18px;
+}
+
+.lead-reason {
+    font-size: 16px;
+    line-height: 1.7;
+}
+
+.lead-avatar {
+    font-size: 15px;
+}
