@@ -66,7 +66,7 @@ Tune the schedule when needed:
 
     python worker/run.py work --poll-seconds 60 --discovery-interval-minutes 360 --discovery-limit 10 --pipeline-limit 10
 
-Local automation requires the Laravel server and worker process to stay running. The Windows auto-start milestone will launch both when the PC starts. A later VPS deployment can keep the same scheduler running while the PC is off.
+Local automation requires the Laravel server and worker process to stay running. Windows auto-start support is available under scripts/windows; see docs/WINDOWS_AUTOSTART.md. A later VPS deployment can keep the same scheduler running while the PC is off.
 
 ## Automated website analyzer
 
