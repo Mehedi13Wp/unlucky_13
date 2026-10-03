@@ -41,6 +41,11 @@ Route::middleware('auth')->group(function (): void {
         [OutreachDraftController::class, 'approve'],
     )->name('outreach-drafts.approve');
 
+    Route::post(
+        '/leads/{lead}/outreach-drafts/{outreachDraft}/send',
+        [OutreachDraftController::class, 'send'],
+    )->name('outreach-drafts.send');
+
     Route::patch(
         '/leads/{lead}/outreach-drafts/{outreachDraft}/reject',
         [OutreachDraftController::class, 'reject'],

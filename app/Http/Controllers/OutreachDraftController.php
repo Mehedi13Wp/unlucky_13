@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\LeadStatus;
 use App\Models\Lead;
 use App\Models\OutreachDraft;
+use App\Services\Outreach\ApprovedEmailDeliveryService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -35,6 +36,33 @@ class OutreachDraftController extends Controller
         return back()->with(
             'success',
             'Outreach draft approved. Nothing has been sent.',
+        );
+    }
+
+    public function send(
+        Request $request,
+        Lead $lead,
+        OutreachDraft $outreachDraft,
+        ApprovedEmailDeliveryService $deliveryService,
+    ): RedirectResponse {
+        $this->ensureOwnerAndDraft($request, $lead, $outreachDraft);
+
+        $result = $deliveryService->send($outreachDraft);
+
+        if ($result['status'] === 'sent') {
+            return back()->with(
+                'success',
+                'Email sent to '.$outreachDraft->recipient.'.',
+            );
+        }
+
+        if ($result['status'] === 'already_sent') {
+            return back()->with('success', 'This email has already been sent.');
+        }
+
+        return back()->with(
+            'error',
+            (string) ($result['message'] ?? 'Email could not be sent.'),
         );
     }
 

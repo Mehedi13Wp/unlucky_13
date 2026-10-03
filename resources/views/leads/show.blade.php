@@ -154,7 +154,19 @@
                         </div>
                     @elseif ($latestDraft->status === 'approved')
                         @if ($latestDraft->channel === 'email')
-                            <p class="lead-reason">Approved and waiting for explicit controlled email delivery. Nothing has been sent yet.</p>
+                            <p class="lead-reason">
+                                Approved and ready to send to <strong>{{ $latestDraft->recipient }}</strong>.
+                                Clicking Send Email sends exactly the approved message above through your configured mail account.
+                            </p>
+
+                            <div class="lead-form-footer" style="margin: 18px -19px -19px;">
+                                <form method="POST" action="{{ route('outreach-drafts.send', [$lead, $latestDraft]) }}">
+                                    @csrf
+                                    <button class="button button-primary" type="submit">
+                                        Send Email
+                                    </button>
+                                </form>
+                            </div>
                         @else
                             <p class="lead-reason">Approved for manual contact-form outreach. The automated sender will not submit public web forms.</p>
                         @endif
