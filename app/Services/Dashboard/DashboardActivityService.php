@@ -31,15 +31,19 @@ class DashboardActivityService
             ->max('last_run_at');
 
         return [
+            'campaigns' => $user->campaigns()->count(),
             'active_campaigns' => $user->campaigns()
                 ->where('status', CampaignStatus::Active)
                 ->count(),
             'businesses_found' => (clone $leadQuery)->count(),
             'qualified' => (clone $leadQuery)
-                ->where('status', LeadStatus::Qualified)
+                ->whereNotNull('qualified_at')
                 ->count(),
             'review_queue' => (clone $leadQuery)
                 ->where('status', LeadStatus::ReadyForReview)
+                ->count(),
+            'interested' => (clone $leadQuery)
+                ->where('status', LeadStatus::Interested)
                 ->count(),
             'new_leads_today' => (clone $leadQuery)
                 ->where('created_at', '>=', $today)

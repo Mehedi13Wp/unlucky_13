@@ -32,7 +32,7 @@ class DashboardController extends Controller
             'draft_campaigns' => (clone $campaignQuery)->where('status', CampaignStatus::Draft)->count(),
             'paused_campaigns' => (clone $campaignQuery)->where('status', CampaignStatus::Paused)->count(),
             'leads' => (clone $leadQuery)->count(),
-            'qualified_leads' => (clone $leadQuery)->where('status', LeadStatus::Qualified)->count(),
+            'qualified_leads' => (clone $leadQuery)->whereNotNull('qualified_at')->count(),
             'review_queue' => (clone $leadQuery)->where('status', LeadStatus::ReadyForReview)->count(),
             'interested_leads' => (clone $leadQuery)->where('status', LeadStatus::Interested)->count(),
         ];

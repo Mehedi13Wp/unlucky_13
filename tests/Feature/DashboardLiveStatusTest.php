@@ -29,6 +29,7 @@ class DashboardLiveStatusTest extends TestCase
         $lead = Lead::factory()->for($campaign)->create([
             'status' => LeadStatus::ReadyForReview,
             'analyzed_at' => now()->subMinute(),
+            'qualified_at' => now()->subMinute(),
             'created_at' => now()->subMinutes(2),
         ]);
 
@@ -68,8 +69,11 @@ class DashboardLiveStatusTest extends TestCase
             ->assertOk()
             ->assertJsonPath('worker.state', 'running')
             ->assertJsonPath('activity.active_campaigns', 1)
+            ->assertJsonPath('activity.campaigns', 1)
             ->assertJsonPath('activity.businesses_found', 1)
+            ->assertJsonPath('activity.qualified', 1)
             ->assertJsonPath('activity.review_queue', 1)
+            ->assertJsonPath('activity.interested', 0)
             ->assertJsonPath('activity.new_leads_today', 1)
             ->assertJsonPath('activity.analyzed_today', 1)
             ->assertJsonPath('activity.drafts_today', 1);

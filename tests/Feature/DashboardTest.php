@@ -25,12 +25,14 @@ class DashboardTest extends TestCase
 
         Lead::factory()->for($campaign)->create([
             'business_name' => 'Example Restaurant',
-            'status' => LeadStatus::Qualified,
+            'status' => LeadStatus::ReadyForReview,
+            'qualified_at' => now()->subMinutes(10),
         ]);
 
         Lead::factory()->for($campaign)->create([
             'business_name' => 'Interested Restaurant',
             'status' => LeadStatus::Interested,
+            'qualified_at' => now()->subMinutes(20),
         ]);
 
         $this->actingAs($user)
@@ -42,7 +44,7 @@ class DashboardTest extends TestCase
             ->assertSee('Restaurant Booking Campaign')
             ->assertSee('Example Restaurant')
             ->assertSee('Interested Restaurant')
-            ->assertSee('50% qualification rate');
+            ->assertSee('100% qualification rate');
     }
 
     public function test_empty_dashboard_guides_user_to_create_first_campaign(): void
