@@ -39,27 +39,26 @@
             @endif
         </div>
 
+        @php
+            $runtimeState = $workerStatus['state'] ?? 'stopped';
+            $runtimeTitle = match ($runtimeState) {
+                'starting' => 'Starting background worker',
+                'running' => 'Processing active campaigns',
+                'stopping' => 'Finishing current operation',
+                default => 'Stopped by you',
+            };
+            $workerStartDisabled = in_array($runtimeState, ['starting', 'running', 'stopping'], true)
+                || ! $workerStatus['supported'];
+            $workerStopDisabled = ! in_array($runtimeState, ['starting', 'running'], true)
+                || ! $workerStatus['supported'];
+        @endphp
+
         <div class="hero-control-card">
             <div class="control-card-head">
                 <div>
                     <span class="control-label">Automation worker</span>
-                    <strong>
-                        @switch($workerStatus['state'] ?? 'stopped')
-                            @case('starting')
-                                Starting background worker
-                                @break
-                            @case('running')
-                                Processing active campaigns
-                                @break
-                            @case('stopping')
-                                Finishing current operation
-                                @break
-                            @default
-                                Stopped by you
-                        @endswitch
-                    </strong>
+                    <strong>{{ $runtimeTitle }}</strong>
                 </div>
-                @php($runtimeState = $workerStatus['state'] ?? 'stopped')
                 <span class="control-state {{ in_array($runtimeState, ['starting', 'running'], true) ? 'running' : 'stopped' }}">
                     {{ strtoupper($runtimeState) }}
                 </span>
@@ -71,7 +70,7 @@
                     <button
                         class="button button-worker-start"
                         type="submit"
-                        @disabled(in_array($runtimeState, ['starting', 'running', 'stopping'], true) || ! $workerStatus['supported'])
+                        @if ($workerStartDisabled) disabled @endif
                     >
                         Start Worker
                     </button>
@@ -82,7 +81,7 @@
                     <button
                         class="button button-worker-stop"
                         type="submit"
-                        @disabled(! in_array($runtimeState, ['starting', 'running'], true) || ! $workerStatus['supported'])
+                        @if ($workerStopDisabled) disabled @endif
                     >
                         Stop Worker
                     </button>
