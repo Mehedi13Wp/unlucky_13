@@ -20,6 +20,7 @@ class WorkerRuntimeControlTest extends TestCase
         $manager->shouldReceive('status')->once()->andReturn([
             'supported' => true,
             'running' => false,
+            'state' => 'stopped',
             'pid' => null,
             'message' => 'Worker is stopped.',
         ]);
@@ -43,6 +44,7 @@ class WorkerRuntimeControlTest extends TestCase
         $manager->shouldReceive('start')->once()->andReturn([
             'supported' => true,
             'running' => true,
+            'state' => 'running',
             'pid' => 1234,
             'message' => 'Worker started.',
         ]);
@@ -64,6 +66,7 @@ class WorkerRuntimeControlTest extends TestCase
         $manager->shouldReceive('stop')->once()->andReturn([
             'supported' => true,
             'running' => false,
+            'state' => 'stopped',
             'pid' => null,
             'message' => 'Worker stopped.',
         ]);

@@ -48,8 +48,14 @@ class WorkerScheduler:
         self.clock = clock or (lambda: datetime.now(timezone.utc))
         self.sleeper = sleeper
 
-    def run_cycle(self, config: SchedulerConfig) -> dict[str, int]:
+    def run_cycle(
+        self,
+        config: SchedulerConfig,
+        *,
+        should_stop: Callable[[], bool] | None = None,
+    ) -> dict[str, int]:
         settings = config.normalized()
+        stop_requested = should_stop or (lambda: False)
         response = self.client.active_campaigns()
         campaigns = list(response.get("campaigns") or [])
 
@@ -78,6 +84,9 @@ class WorkerScheduler:
         stats["discovery_due"] = len(due)
 
         for campaign in due:
+            if stop_requested():
+                break
+
             campaign_uuid = str(campaign.get("uuid") or "").strip()
             campaign_name = str(campaign.get("name") or campaign_uuid or "campaign")
 
@@ -119,6 +128,9 @@ class WorkerScheduler:
             stats["discovery_completed"] += 1
 
         for command in self.PIPELINE_COMMANDS:
+            if stop_requested():
+                break
+
             print(f"[scheduler] running {command} queue")
             exit_code = self.command_runner(
                 [command, "--limit", str(settings.pipeline_limit)]
@@ -133,8 +145,14 @@ class WorkerScheduler:
 
         return stats
 
-    def run_forever(self, config: SchedulerConfig) -> None:
+    def run_forever(
+        self,
+        config: SchedulerConfig,
+        *,
+        should_stop: Callable[[], bool] | None = None,
+    ) -> None:
         settings = config.normalized()
+        stop_requested = should_stop or (lambda: False)
 
         print(
             "[scheduler] started "
@@ -148,9 +166,9 @@ class WorkerScheduler:
             "human-approved sending remains a separate command"
         )
 
-        while True:
+        while not stop_requested():
             try:
-                stats = self.run_cycle(settings)
+                stats = self.run_cycle(settings, should_stop=stop_requested)
                 print(
                     "[scheduler] cycle complete "
                     f"active={stats['active_campaigns']} "
@@ -167,7 +185,14 @@ class WorkerScheduler:
                     f"{type(error).__name__}: {error}"
                 )
 
-            self.sleeper(settings.poll_seconds)
+            remaining = settings.poll_seconds
+
+            while remaining > 0 and not stop_requested():
+                step = min(1.0, remaining)
+                self.sleeper(step)
+                remaining -= step
+
+        print("[scheduler] stop requested; managed worker exiting")
 
     @staticmethod
     def is_discovery_due(

@@ -43,10 +43,25 @@
             <div class="control-card-head">
                 <div>
                     <span class="control-label">Automation worker</span>
-                    <strong>{{ $workerStatus['running'] ? 'Processing active campaigns' : 'Stopped by you' }}</strong>
+                    <strong>
+                        @switch($workerStatus['state'] ?? 'stopped')
+                            @case('starting')
+                                Starting background worker
+                                @break
+                            @case('running')
+                                Processing active campaigns
+                                @break
+                            @case('stopping')
+                                Finishing current operation
+                                @break
+                            @default
+                                Stopped by you
+                        @endswitch
+                    </strong>
                 </div>
-                <span class="control-state {{ $workerStatus['running'] ? 'running' : 'stopped' }}">
-                    {{ $workerStatus['running'] ? 'RUNNING' : 'STOPPED' }}
+                @php($runtimeState = $workerStatus['state'] ?? 'stopped')
+                <span class="control-state {{ in_array($runtimeState, ['starting', 'running'], true) ? 'running' : 'stopped' }}">
+                    {{ strtoupper($runtimeState) }}
                 </span>
             </div>
 
@@ -56,7 +71,7 @@
                     <button
                         class="button button-worker-start"
                         type="submit"
-                        @disabled($workerStatus['running'] || ! $workerStatus['supported'])
+                        @disabled(in_array($runtimeState, ['starting', 'running', 'stopping'], true) || ! $workerStatus['supported'])
                     >
                         Start Worker
                     </button>
@@ -67,7 +82,7 @@
                     <button
                         class="button button-worker-stop"
                         type="submit"
-                        @disabled(! $workerStatus['running'] || ! $workerStatus['supported'])
+                        @disabled(! in_array($runtimeState, ['starting', 'running'], true) || ! $workerStatus['supported'])
                     >
                         Stop Worker
                     </button>

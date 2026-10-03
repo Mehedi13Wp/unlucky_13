@@ -13,6 +13,7 @@ from .config import WorkerConfig
 from .discovery_cache import DiscoveryCache, DiscoveryCacheError
 from .discovery_sources import DiscoverySourceError, OpenStreetMapDiscoverySource
 from .outreach_drafter import OutreachDraftError, OutreachDrafter
+from .runtime import ManagedWorkerRuntime
 from .scheduler import SchedulerConfig, WorkerScheduler
 from .website_analyzer import AnalyzerError, WebsiteAnalyzer
 
@@ -59,6 +60,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=10,
         help="Maximum leads processed per analysis/contact/draft queue cycle (default: 10).",
+    )
+
+    work.add_argument(
+        "--managed",
+        action="store_true",
+        help=argparse.SUPPRESS,
     )
 
     discover = subparsers.add_parser(
@@ -238,10 +245,30 @@ def main(argv: list[str] | None = None) -> int:
                     or stats["pipeline_failed"] > 0
                 ) else 0
 
+            runtime = ManagedWorkerRuntime() if args.managed else None
+
+            if runtime is not None:
+                if not runtime.acquire():
+                    print("[scheduler] managed worker is already running")
+                    return 0
+
+                runtime.clear_stop_request()
+                runtime.mark_running()
+                runtime.start_heartbeat()
+
             try:
-                scheduler.run_forever(settings)
+                scheduler.run_forever(
+                    settings,
+                    should_stop=runtime.stop_requested if runtime is not None else None,
+                )
             except KeyboardInterrupt:
                 print("\n[scheduler] stopped by user")
+            finally:
+                if runtime is not None:
+                    runtime.stop_heartbeat()
+                    runtime.mark_stopped()
+                    runtime.release()
+
             return 0
 
         if args.command == "discover-osm":
