@@ -15,7 +15,7 @@ class CompleteContactDiscoveryRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'contacts' => ['required', 'array', 'max:10'],
+            'contacts' => ['present', 'array', 'max:10'],
             'contacts.*.type' => [
                 'required',
                 'string',

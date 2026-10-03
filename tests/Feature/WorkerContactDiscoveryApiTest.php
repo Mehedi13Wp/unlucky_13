@@ -114,6 +114,31 @@ class WorkerContactDiscoveryApiTest extends TestCase
         $this->assertSame(LeadStatus::Qualified, $lead->fresh()->status);
     }
 
+    public function test_qualified_lead_can_complete_contact_discovery_with_no_public_contacts(): void
+    {
+        $user = User::factory()->create();
+        $campaign = Campaign::factory()->for($user)->create([
+            'status' => CampaignStatus::Active,
+        ]);
+        $lead = Lead::factory()->for($campaign)->create([
+            'status' => LeadStatus::Qualified,
+            'qualified_at' => now(),
+        ]);
+
+        $this->withToken($this->token)
+            ->postJson('/api/worker/leads/'.$lead->uuid.'/contacts/complete', [
+                'contacts' => [],
+                'notes' => [
+                    'No public contact path found on inspected pages.',
+                ],
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', 'completed')
+            ->assertJsonPath('contact_count', 0);
+
+        $this->assertNotNull($lead->fresh()->contact_discovered_at);
+    }
+
     public function test_non_qualified_lead_cannot_receive_worker_contacts(): void
     {
         $user = User::factory()->create();
