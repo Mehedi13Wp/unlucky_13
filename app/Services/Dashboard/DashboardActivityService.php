@@ -58,6 +58,21 @@ class DashboardActivityService
             ])
             ->count();
 
+        $discoveryTelemetry = $this->discoveryTelemetry($user);
+        $discoveryAttemptLabel = $this->relativeLabel(
+            $discoveryTelemetry['attempted_at'] ?? null,
+            true,
+            'No attempt yet',
+        );
+        $discoveryFresh = (int) ($discoveryTelemetry['fresh_created'] ?? 0);
+        $discoveryDuplicates = (int) ($discoveryTelemetry['duplicates_skipped'] ?? 0);
+        $discoveryFailed = (int) ($discoveryTelemetry['failed'] ?? 0);
+        $discoveryDetail = $discoveryTelemetry === null
+            ? "No discovery attempt recorded yet · saved total {$businessesFound}"
+            : "Last attempt {$discoveryAttemptLabel} · Fresh +{$discoveryFresh} · "
+                ."duplicates skipped {$discoveryDuplicates} · errors {$discoveryFailed} · "
+                ."saved total {$businessesFound}";
+
         return [
             'campaigns' => $campaigns,
             'active_campaigns' => $activeCampaigns,
@@ -102,8 +117,47 @@ class DashboardActivityService
                 true,
                 'No discovery yet',
             ),
+            'discovery_attempt_at' => $discoveryTelemetry['attempted_at'] ?? null,
+            'discovery_attempt_label' => $discoveryAttemptLabel,
+            'discovery_fresh' => $discoveryFresh,
+            'discovery_duplicates_skipped' => $discoveryDuplicates,
+            'discovery_failed' => $discoveryFailed,
+            'discovery_candidates_scanned' => (int) ($discoveryTelemetry['candidates_scanned'] ?? 0),
+            'discovery_detail' => $discoveryDetail,
             'last_cycle' => $workerStatus['last_cycle'] ?? [],
         ];
+    }
+
+    private function discoveryTelemetry(User $user): ?array
+    {
+        $path = storage_path('app/worker-runtime/last-discovery.json');
+
+        if (! is_file($path)) {
+            return null;
+        }
+
+        $contents = @file_get_contents($path);
+
+        if (! is_string($contents) || trim($contents) === '') {
+            return null;
+        }
+
+        $decoded = json_decode($contents, true);
+
+        if (! is_array($decoded)) {
+            return null;
+        }
+
+        $campaignUuid = trim((string) ($decoded['campaign_uuid'] ?? ''));
+
+        if (
+            $campaignUuid !== ''
+            && ! $user->campaigns()->where('uuid', $campaignUuid)->exists()
+        ) {
+            return null;
+        }
+
+        return $decoded;
     }
 
     private function relativeLabel(

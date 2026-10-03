@@ -959,3 +959,9 @@ a.activity-row:hover {
         font-size: 15px;
     }
 }
+
+
+.worker-live-item-discovery small {
+    color: #b8c7bd;
+    font-weight: 650;
+}

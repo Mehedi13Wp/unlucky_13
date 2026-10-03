@@ -12,6 +12,7 @@ from .contact_discovery import ContactDiscoveryError, ContactFinder
 from .config import WorkerConfig
 from .discovery_cache import DiscoveryCache, DiscoveryCacheError
 from .discovery_sources import DiscoverySourceError, OpenStreetMapDiscoverySource
+from .discovery_telemetry import write_discovery_telemetry
 from .outreach_drafter import OutreachDraftError, OutreachDrafter
 from .runtime import ManagedWorkerRuntime
 from .scheduler import SchedulerConfig, WorkerScheduler
@@ -434,6 +435,20 @@ def main(argv: list[str] | None = None) -> int:
                 f"duplicate={duplicate_total} skipped_known={skipped_known_total} "
                 f"failed={failed_total}"
             )
+
+            if not args.dry_run:
+                write_discovery_telemetry(
+                    {
+                        "campaign_uuid": args.campaign,
+                        "candidates_scanned": discovered_total,
+                        "fresh_created": created_total,
+                        "api_duplicates": duplicate_total,
+                        "known_duplicates_skipped": skipped_known_total,
+                        "duplicates_skipped": duplicate_total + skipped_known_total,
+                        "failed": failed_total,
+                    }
+                )
+
             return 1 if failed_total else 0
 
         if args.command == "contacts":

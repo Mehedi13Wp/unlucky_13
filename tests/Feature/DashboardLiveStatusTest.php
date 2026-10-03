@@ -19,6 +19,19 @@ class DashboardLiveStatusTest extends TestCase
 
     public function test_authenticated_dashboard_live_status_reports_real_activity_counts(): void
     {
+        $telemetryPath = storage_path('app/worker-runtime/last-discovery.json');
+        @mkdir(dirname($telemetryPath), 0775, true);
+        file_put_contents($telemetryPath, json_encode([
+            'attempted_at' => now()->subSeconds(20)->toISOString(),
+            'campaign_uuid' => null,
+            'candidates_scanned' => 25,
+            'fresh_created' => 4,
+            'api_duplicates' => 1,
+            'known_duplicates_skipped' => 12,
+            'duplicates_skipped' => 13,
+            'failed' => 0,
+        ]));
+
         $user = User::factory()->create();
 
         $campaign = Campaign::factory()->for($user)->create([
@@ -78,7 +91,13 @@ class DashboardLiveStatusTest extends TestCase
             ->assertJsonPath('activity.interested', 0)
             ->assertJsonPath('activity.new_leads_today', 1)
             ->assertJsonPath('activity.analyzed_today', 1)
-            ->assertJsonPath('activity.drafts_today', 1);
+            ->assertJsonPath('activity.drafts_today', 1)
+            ->assertJsonPath('activity.discovery_fresh', 4)
+            ->assertJsonPath('activity.discovery_duplicates_skipped', 13)
+            ->assertJsonPath('activity.discovery_failed', 0)
+            ->assertJsonPath('activity.discovery_candidates_scanned', 25);
+
+        @unlink($telemetryPath);
     }
 
     public function test_dashboard_live_status_requires_authentication(): void

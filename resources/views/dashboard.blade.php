@@ -130,10 +130,10 @@
             <strong id="worker-last-cycle">{{ $workerActivity['last_cycle_label'] }}</strong>
             <small>Discovery + analysis + contacts + drafts</small>
         </div>
-        <div class="worker-live-item">
-            <span>Last discovery</span>
-            <strong id="worker-last-discovery">{{ $workerActivity['last_discovery_label'] }}</strong>
-            <small>Fresh business discovery every 30 minutes per active campaign</small>
+        <div class="worker-live-item worker-live-item-discovery">
+            <span>Discovery activity</span>
+            <strong id="worker-last-discovery">Last success {{ $workerActivity['last_discovery_label'] }}</strong>
+            <small id="worker-discovery-detail">{{ $workerActivity['discovery_detail'] }}</small>
         </div>
         <div class="worker-live-item">
             <span>New leads today</span>
@@ -442,7 +442,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         setText('worker-heartbeat', activity.heartbeat_label || 'Waiting for worker');
         setText('worker-last-cycle', activity.last_cycle_label || 'No cycle yet');
-        setText('worker-last-discovery', activity.last_discovery_label || 'No discovery yet');
+        setText(
+            'worker-last-discovery',
+            'Last success ' + (activity.last_discovery_label || 'No discovery yet')
+        );
+        setText(
+            'worker-discovery-detail',
+            activity.discovery_detail || ('No discovery attempt recorded yet · saved total ' + (activity.businesses_found ?? 0))
+        );
         setText('worker-new-leads-today', activity.new_leads_today ?? 0);
         setText('worker-analyzed-today', activity.analyzed_today ?? 0);
         setText('worker-drafts-today', activity.drafts_today ?? 0);

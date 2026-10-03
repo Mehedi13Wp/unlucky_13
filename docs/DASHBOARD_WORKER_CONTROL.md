@@ -85,3 +85,12 @@ The managed worker now uses a 30-minute discovery interval per active campaign.
 - Each due discovery run still targets up to 10 fresh businesses and global domain deduplication remains active.
 
 Dashboard polling remains every 30 seconds and is separate from external discovery.
+
+
+## Discovery result visibility
+
+Each real OpenStreetMap discovery attempt now writes a compact local telemetry summary to:
+
+    storage/app/worker-runtime/last-discovery.json
+
+The dashboard exposes the latest attempt so a static Businesses found total is explainable. It shows the last successful discovery time plus the latest attempt's fresh businesses created, duplicate domains skipped, errors, and current saved-business total. Dry-run discovery does not overwrite operational telemetry.
