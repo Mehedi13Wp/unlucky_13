@@ -68,7 +68,6 @@ class DashboardLiveStatusTest extends TestCase
             ->getJson('/dashboard/live-status')
             ->assertOk()
             ->assertJsonPath('worker.state', 'running')
-            ->assertJsonPath('activity.active_campaigns', 1)
             ->assertJsonPath('activity.campaigns', 1)
             ->assertJsonPath('activity.active_campaigns', 1)
             ->assertJsonPath('activity.draft_campaigns', 0)
