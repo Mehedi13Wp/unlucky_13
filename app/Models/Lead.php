@@ -32,6 +32,7 @@ class Lead extends Model
         'analyzed_at',
         'qualified_at',
         'contact_discovered_at',
+        'contact_discovery_version',
         'last_contacted_at',
         'replied_at',
     ];
@@ -52,6 +53,7 @@ class Lead extends Model
             'analyzed_at' => 'datetime',
             'qualified_at' => 'datetime',
             'contact_discovered_at' => 'datetime',
+            'contact_discovery_version' => 'integer',
             'last_contacted_at' => 'datetime',
             'replied_at' => 'datetime',
         ];

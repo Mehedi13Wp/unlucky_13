@@ -1,3 +1,4 @@
+import json
 import unittest
 
 from worker.unlucky13_worker.contact_discovery import ContactFinder
@@ -7,9 +8,15 @@ from worker.unlucky13_worker.website_analyzer import WebsiteSnapshot
 class FakeFetcher:
     def __init__(self, pages):
         self.pages = pages
+        self.requested = []
 
     def fetch(self, url):
+        self.requested.append(url)
         return self.pages[url]
+
+
+def cf_encode(email: str, key: int = 0x42) -> str:
+    return f"{key:02x}" + "".join(f"{ord(char) ^ key:02x}" for char in email)
 
 
 class ContactFinderTest(unittest.TestCase):
@@ -51,6 +58,121 @@ class ContactFinderTest(unittest.TestCase):
         self.assertIn(("contact_page", "https://restaurant.example/contact"), pairs)
         self.assertNotIn(("contact_page", "https://outside.example/contact"), pairs)
         self.assertEqual(2, len(result["pages_inspected"]))
+
+    def test_crawls_real_estate_team_and_agent_pages_for_email(self):
+        home = WebsiteSnapshot(
+            requested_url="https://agency.example",
+            final_url="https://agency.example",
+            status_code=200,
+            content_type="text/html",
+            html='<html><body><a href="/about">About us</a></body></html>',
+        )
+        about = WebsiteSnapshot(
+            requested_url="https://agency.example/about",
+            final_url="https://agency.example/about",
+            status_code=200,
+            content_type="text/html",
+            html='<html><body><a href="/agents">Meet our agents</a></body></html>',
+        )
+        agents = WebsiteSnapshot(
+            requested_url="https://agency.example/agents",
+            final_url="https://agency.example/agents",
+            status_code=200,
+            content_type="text/html",
+            html="<html><body>Sales team: homes@agency.example</body></html>",
+        )
+
+        fetcher = FakeFetcher(
+            {
+                "https://agency.example": home,
+                "https://agency.example/about": about,
+                "https://agency.example/agents": agents,
+            }
+        )
+        result = ContactFinder(fetcher=fetcher, max_pages=5).discover(
+            {"website_url": "https://agency.example"}
+        )
+
+        pairs = {(item["type"], item["value"]) for item in result["contacts"]}
+        self.assertIn(("email", "homes@agency.example"), pairs)
+        self.assertEqual(
+            [
+                "https://agency.example",
+                "https://agency.example/about",
+                "https://agency.example/agents",
+            ],
+            result["pages_inspected"],
+        )
+
+    def test_reads_json_ld_email_phone_and_social_profiles(self):
+        structured = {
+            "@context": "https://schema.org",
+            "@type": "RealEstateAgent",
+            "email": "office@agency.example",
+            "telephone": "(212) 555-0144",
+            "sameAs": [
+                "https://www.facebook.com/AgencyExample",
+                "https://www.instagram.com/agencyexample/",
+                "https://www.linkedin.com/company/agency-example/",
+            ],
+        }
+        home = WebsiteSnapshot(
+            requested_url="https://agency.example",
+            final_url="https://agency.example",
+            status_code=200,
+            content_type="text/html",
+            html=(
+                '<html><head><script type="application/ld+json">'
+                + json.dumps(structured)
+                + "</script></head><body>Agency</body></html>"
+            ),
+        )
+
+        result = ContactFinder(
+            fetcher=FakeFetcher({"https://agency.example": home})
+        ).discover(
+            {
+                "website_url": "https://agency.example",
+                "country": "United States",
+            }
+        )
+        pairs = {(item["type"], item["value"]) for item in result["contacts"]}
+
+        self.assertIn(("email", "office@agency.example"), pairs)
+        self.assertIn(("phone", "+12125550144"), pairs)
+        self.assertIn(("facebook", "https://www.facebook.com/AgencyExample"), pairs)
+        self.assertIn(("instagram", "https://www.instagram.com/agencyexample"), pairs)
+        self.assertIn(
+            ("linkedin", "https://www.linkedin.com/company/agency-example"),
+            pairs,
+        )
+
+    def test_decodes_obfuscated_and_cloudflare_email(self):
+        encoded = cf_encode("leasing@agency.example")
+        home = WebsiteSnapshot(
+            requested_url="https://agency.example",
+            final_url="https://agency.example",
+            status_code=200,
+            content_type="text/html",
+            html=f"""
+                <html><body>
+                    <p>General: info [at] agency [dot] example</p>
+                    <span class="__cf_email__" data-cfemail="{encoded}">email protected</span>
+                </body></html>
+            """,
+        )
+
+        result = ContactFinder(
+            fetcher=FakeFetcher({"https://agency.example": home})
+        ).discover({"website_url": "https://agency.example"})
+        emails = {
+            item["value"]
+            for item in result["contacts"]
+            if item["type"] == "email"
+        }
+
+        self.assertIn("info@agency.example", emails)
+        self.assertIn("leasing@agency.example", emails)
 
     def test_finds_official_social_links_from_the_business_website(self):
         home = WebsiteSnapshot(
@@ -105,6 +227,33 @@ class ContactFinderTest(unittest.TestCase):
 
         self.assertEqual("email", result["contacts"][0]["type"])
         self.assertEqual("bookings@restaurant.example", result["contacts"][0]["value"])
+
+    def test_same_domain_email_is_ranked_before_external_mailbox(self):
+        home = WebsiteSnapshot(
+            requested_url="https://agency.example",
+            final_url="https://agency.example",
+            status_code=200,
+            content_type="text/html",
+            html=(
+                "<html><body>"
+                "backup.agency@gmail.com "
+                "sales@agency.example"
+                "</body></html>"
+            ),
+        )
+
+        result = ContactFinder(
+            fetcher=FakeFetcher({"https://agency.example": home})
+        ).discover({"website_url": "https://agency.example"})
+
+        emails = [
+            item["value"]
+            for item in result["contacts"]
+            if item["type"] == "email"
+        ]
+
+        self.assertEqual("sales@agency.example", emails[0])
+        self.assertIn("backup.agency@gmail.com", emails)
 
     def test_us_phone_numbers_are_normalized_for_deduplication(self):
         home = WebsiteSnapshot(
@@ -174,6 +323,36 @@ class ContactFinderTest(unittest.TestCase):
         ]
 
         self.assertEqual(["https://restaurant.example/contact"], pages)
+
+    def test_external_redirect_content_is_not_used_as_business_contact(self):
+        home = WebsiteSnapshot(
+            requested_url="https://agency.example",
+            final_url="https://agency.example",
+            status_code=200,
+            content_type="text/html",
+            html='<html><body><a href="/contact">Contact</a></body></html>',
+        )
+        redirected = WebsiteSnapshot(
+            requested_url="https://agency.example/contact",
+            final_url="https://outside.example/contact",
+            status_code=200,
+            content_type="text/html",
+            html="<html><body>outside@outside.example</body></html>",
+        )
+
+        result = ContactFinder(
+            fetcher=FakeFetcher(
+                {
+                    "https://agency.example": home,
+                    "https://agency.example/contact": redirected,
+                }
+            )
+        ).discover({"website_url": "https://agency.example"})
+
+        self.assertFalse(
+            any(item["value"] == "outside@outside.example" for item in result["contacts"])
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

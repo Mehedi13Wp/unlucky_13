@@ -12,13 +12,22 @@ use Illuminate\Http\Request;
 
 class WorkerContactDiscoveryController extends Controller
 {
+    private const CONTACT_DISCOVERY_VERSION = 2;
+
     public function queue(Request $request): JsonResponse
     {
         $limit = max(1, min((int) $request->integer('limit', 10), 25));
 
         $leads = Lead::query()
-            ->where('status', LeadStatus::Qualified->value)
-            ->whereNull('contact_discovered_at')
+            ->whereIn('status', [
+                LeadStatus::Qualified->value,
+                LeadStatus::ReadyForReview->value,
+            ])
+            ->where(function ($query): void {
+                $query
+                    ->whereNull('contact_discovered_at')
+                    ->orWhere('contact_discovery_version', '<', self::CONTACT_DISCOVERY_VERSION);
+            })
             ->whereHas(
                 'campaign',
                 fn ($query) => $query->where('status', CampaignStatus::Active->value),
@@ -40,6 +49,7 @@ class WorkerContactDiscoveryController extends Controller
                 'city' => $lead->city,
                 'status' => $lead->status->value,
                 'qualification_score' => $lead->qualification_score,
+                'contact_discovery_version' => $lead->contact_discovery_version,
                 'observed_signals' => $lead->observed_signals ?? [],
                 'campaign' => [
                     'uuid' => $lead->campaign->uuid,
@@ -63,9 +73,12 @@ class WorkerContactDiscoveryController extends Controller
             ], 409);
         }
 
-        if ($lead->status !== LeadStatus::Qualified) {
+        if (! in_array($lead->status, [
+            LeadStatus::Qualified,
+            LeadStatus::ReadyForReview,
+        ], true)) {
             return response()->json([
-                'message' => 'Only qualified leads can receive discovered contacts.',
+                'message' => 'Only qualified or review-ready leads can receive discovered contacts.',
                 'code' => 'lead_not_qualified',
             ], 409);
         }
@@ -103,6 +116,7 @@ class WorkerContactDiscoveryController extends Controller
 
         $lead->update([
             'contact_discovered_at' => now(),
+            'contact_discovery_version' => self::CONTACT_DISCOVERY_VERSION,
         ]);
 
         return response()->json([
@@ -114,6 +128,7 @@ class WorkerContactDiscoveryController extends Controller
                 'uuid' => $lead->uuid,
                 'status' => $lead->status->value,
                 'contact_discovered_at' => $lead->fresh()->contact_discovered_at?->toISOString(),
+                'contact_discovery_version' => $lead->fresh()->contact_discovery_version,
             ],
         ]);
     }

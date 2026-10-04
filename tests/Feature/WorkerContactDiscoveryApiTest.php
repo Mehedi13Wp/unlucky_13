@@ -56,6 +56,7 @@ class WorkerContactDiscoveryApiTest extends TestCase
             'status' => LeadStatus::Qualified,
             'qualified_at' => now(),
             'contact_discovered_at' => now(),
+            'contact_discovery_version' => 2,
         ]);
 
         $this->withToken($this->token)
@@ -64,6 +65,27 @@ class WorkerContactDiscoveryApiTest extends TestCase
             ->assertJsonPath('count', 1)
             ->assertJsonPath('leads.0.uuid', $qualified->uuid)
             ->assertJsonPath('leads.0.business_name', 'Qualified Business');
+    }
+
+    public function test_legacy_review_ready_lead_is_queued_once_for_smart_contact_upgrade(): void
+    {
+        $user = User::factory()->create();
+        $campaign = Campaign::factory()->for($user)->create([
+            'status' => CampaignStatus::Active,
+        ]);
+        $lead = Lead::factory()->for($campaign)->create([
+            'status' => LeadStatus::ReadyForReview,
+            'qualified_at' => now(),
+            'contact_discovered_at' => now()->subHour(),
+            'contact_discovery_version' => 0,
+        ]);
+
+        $this->withToken($this->token)
+            ->getJson('/api/worker/contact-discovery/queue')
+            ->assertOk()
+            ->assertJsonPath('count', 1)
+            ->assertJsonPath('leads.0.uuid', $lead->uuid)
+            ->assertJsonPath('leads.0.contact_discovery_version', 0);
     }
 
     public function test_worker_can_store_public_contacts_for_qualified_lead(): void
@@ -147,6 +169,7 @@ class WorkerContactDiscoveryApiTest extends TestCase
         ]);
 
         $this->assertNotNull($lead->fresh()->contact_discovered_at);
+        $this->assertSame(2, $lead->fresh()->contact_discovery_version);
         $this->assertSame(LeadStatus::Qualified, $lead->fresh()->status);
     }
 
