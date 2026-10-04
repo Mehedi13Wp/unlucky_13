@@ -6,6 +6,7 @@ use App\Enums\CampaignStatus;
 use App\Enums\LeadStatus;
 use App\Models\OutreachDraft;
 use App\Models\OutreachMessage;
+use App\Models\SenderAccount;
 use App\Models\Suppression;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -128,9 +129,26 @@ class ApprovedEmailDeliveryService
             ];
         }
 
-        $mailer = (string) config('mail.default', 'log');
+        $senderPoolExists = SenderAccount::query()
+            ->where('user_id', $campaign->user_id)
+            ->exists();
 
-        if (! in_array($mailer, self::DELIVERY_MAILERS, true)) {
+        $senderAccount = $senderPoolExists
+            ? $this->nextSenderAccount($campaign->user_id)
+            : null;
+
+        if ($senderPoolExists && $senderAccount === null) {
+            return $this->result(
+                'no_sender_available',
+                'You have no available sender emails today. Add/update sender accounts or wait for a daily limit to reset.',
+                409,
+                $outreachDraft,
+            );
+        }
+
+        $mailer = $senderAccount ? 'sender_pool' : (string) config('mail.default', 'log');
+
+        if ($senderAccount === null && ! in_array($mailer, self::DELIVERY_MAILERS, true)) {
             return [
                 ...$this->result(
                     'mailer_not_delivery_capable',
@@ -142,6 +160,10 @@ class ApprovedEmailDeliveryService
             ];
         }
 
+        if ($senderAccount !== null) {
+            $this->configureSenderMailer($senderAccount);
+        }
+
         $message = null;
         $transactionResult = null;
 
@@ -149,6 +171,7 @@ class ApprovedEmailDeliveryService
             $outreachDraft,
             $lead,
             $campaign,
+            $senderAccount,
             &$message,
             &$transactionResult,
         ): void {
@@ -194,6 +217,9 @@ class ApprovedEmailDeliveryService
                 [
                     'lead_id' => $lead->id,
                     'campaign_id' => $campaign->id,
+                    'sender_account_id' => $senderAccount?->id,
+                    'sender_address' => $senderAccount?->email
+                        ?: (string) config('mail.from.address'),
                     'channel' => 'email',
                     'recipient' => Suppression::normalizeEmail($lockedDraft->recipient),
                     'subject' => $lockedDraft->subject,
@@ -211,10 +237,24 @@ class ApprovedEmailDeliveryService
         }
 
         try {
-            Mail::raw($outreachDraft->body, function ($mail) use ($outreachDraft): void {
-                $mail->to($outreachDraft->recipient)
-                    ->subject((string) $outreachDraft->subject);
-            });
+            $mail = $senderAccount !== null
+                ? Mail::mailer('sender_pool')
+                : Mail::mailer($mailer);
+
+            $mail->raw(
+                $outreachDraft->body,
+                function ($message) use ($outreachDraft, $senderAccount): void {
+                    if ($senderAccount !== null) {
+                        $message->from(
+                            $senderAccount->email,
+                            $senderAccount->from_name ?: null,
+                        );
+                    }
+
+                    $message->to($outreachDraft->recipient)
+                        ->subject((string) $outreachDraft->subject);
+                },
+            );
         } catch (Throwable $error) {
             $message?->update([
                 'status' => OutreachMessage::STATUS_FAILED,
@@ -241,7 +281,7 @@ class ApprovedEmailDeliveryService
             );
         }
 
-        DB::transaction(function () use ($message, $outreachDraft, $lead): void {
+        DB::transaction(function () use ($message, $outreachDraft, $lead, $senderAccount): void {
             $message?->update([
                 'status' => OutreachMessage::STATUS_SENT,
                 'error_message' => null,
@@ -256,6 +296,10 @@ class ApprovedEmailDeliveryService
                 'status' => LeadStatus::Contacted,
                 'last_contacted_at' => now(),
             ]);
+
+            $senderAccount?->update([
+                'last_used_at' => now(),
+            ]);
         });
 
         return $this->result(
@@ -266,6 +310,51 @@ class ApprovedEmailDeliveryService
             $message,
             LeadStatus::Contacted->value,
         );
+    }
+
+    private function nextSenderAccount(int $userId): ?SenderAccount
+    {
+        $today = [now()->startOfDay(), now()->endOfDay()];
+
+        $accounts = SenderAccount::query()
+            ->where('user_id', $userId)
+            ->where('enabled', true)
+            ->orderBy('id')
+            ->get();
+
+        foreach ($accounts as $account) {
+            if (! $account->isConfigured()) {
+                continue;
+            }
+
+            $sentToday = OutreachMessage::query()
+                ->where('sender_account_id', $account->id)
+                ->where('status', OutreachMessage::STATUS_SENT)
+                ->whereBetween('sent_at', $today)
+                ->count();
+
+            if ($sentToday < max(1, (int) $account->daily_limit)) {
+                return $account;
+            }
+        }
+
+        return null;
+    }
+
+    private function configureSenderMailer(SenderAccount $account): void
+    {
+        config()->set('mail.mailers.sender_pool', [
+            'transport' => 'smtp',
+            'scheme' => $account->smtp_scheme ?: 'smtp',
+            'host' => $account->smtp_host,
+            'port' => $account->smtp_port,
+            'username' => $account->smtp_username,
+            'password' => $account->smtp_password,
+            'timeout' => 30,
+            'local_domain' => parse_url((string) config('app.url'), PHP_URL_HOST),
+        ]);
+
+        app('mail.manager')->purge('sender_pool');
     }
 
     private function result(
