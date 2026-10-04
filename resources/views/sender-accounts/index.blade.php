@@ -122,6 +122,83 @@
         </article>
     </section>
 
+    <section class="sender-panel sender-automation-panel">
+        <header>
+            <div>
+                <p class="eyebrow">Controlled auto delivery</p>
+                <h3>Approved queue session</h3>
+            </div>
+            <span class="sender-status {{ $automation->enabled ? 'available' : 'disabled' }}">
+                {{ $automation->enabled ? 'Active' : 'Stopped' }}
+            </span>
+        </header>
+
+        <div class="automation-body">
+            <div class="automation-summary">
+                <div>
+                    <span>Approved queue</span>
+                    <strong>{{ $automationStats['approved_queue'] }}</strong>
+                </div>
+                <div>
+                    <span>Sent today</span>
+                    <strong>{{ $automationStats['sent_today'] }}</strong>
+                </div>
+                <div>
+                    <span>Global remaining</span>
+                    <strong>{{ $automationStats['remaining_today'] }}</strong>
+                </div>
+                <div>
+                    <span>Session ends</span>
+                    <strong>{{ $automation->session_ends_at?->diffForHumans() ?? 'Not running' }}</strong>
+                </div>
+            </div>
+
+            <div class="automation-message">
+                <strong>{{ ucwords(str_replace('_', ' ', $automation->last_status ?: 'ready')) }}</strong>
+                <span>{{ $automation->last_message ?: 'Automatic delivery is off. Start a controlled session when your sender pool is ready.' }}</span>
+            </div>
+
+            <form class="automation-form" method="POST" action="{{ route('sender-accounts.automation.start') }}">
+                @csrf
+
+                <label>
+                    <span>Global daily limit</span>
+                    <input type="number" name="global_daily_limit" min="1" max="100" required
+                           value="{{ old('global_daily_limit', $automation->global_daily_limit ?: 20) }}">
+                </label>
+
+                <label>
+                    <span>Minutes between emails</span>
+                    <input type="number" name="interval_minutes" min="5" max="120" required
+                           value="{{ old('interval_minutes', $automation->interval_minutes ?: 15) }}">
+                </label>
+
+                <label>
+                    <span>Session length (hours)</span>
+                    <input type="number" name="session_hours" min="1" max="12" required
+                           value="{{ old('session_hours', $automation->session_hours ?: 5) }}">
+                </label>
+
+                <div class="automation-actions">
+                    <button class="button button-primary" type="submit">
+                        {{ $automation->enabled ? 'Restart session' : 'Start auto delivery' }}
+                    </button>
+                </div>
+            </form>
+
+            @if ($automation->enabled)
+                <form class="automation-stop" method="POST" action="{{ route('sender-accounts.automation.stop') }}">
+                    @csrf
+                    <button class="button button-secondary" type="submit">Stop auto delivery</button>
+                </form>
+            @endif
+
+            <p class="automation-rule">
+                Auto delivery never approves a draft. It only sends email drafts you already approved, one at a time, after the configured interval. Campaign limits, sender limits, suppression, and the global limit still apply.
+            </p>
+        </div>
+    </section>
+
     <section class="sender-panel sender-list-panel">
         <header>
             <div>
@@ -187,7 +264,7 @@
     </section>
 
     <section class="sender-next-step">
-        <strong>Current phase</strong>
-        <p>Sender rotation is connected to approved email delivery. Timed automatic queue sending is the next phase; review-before-send remains unchanged for now.</p>
+        <strong>Delivery safety</strong>
+        <p>If the sender pool runs out, an SMTP send fails, the session expires, or the global daily limit is reached, automatic delivery stops or pauses instead of pushing through the protection.</p>
     </section>
 @endsection
