@@ -7,6 +7,8 @@ use App\Http\Controllers\DashboardLiveStatusController;
 use App\Http\Controllers\LeadController;
 use App\Http\Controllers\OutreachDraftController;
 use App\Http\Controllers\ReviewQueueController;
+use App\Http\Controllers\ReportsController;
+use App\Http\Controllers\WorkerWorkspaceController;
 use App\Http\Controllers\WorkerRuntimeController;
 use Illuminate\Support\Facades\Route;
 
@@ -22,6 +24,9 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/dashboard/live-status', DashboardLiveStatusController::class)
         ->name('dashboard.live-status');
+    Route::get('/worker', [WorkerWorkspaceController::class, 'index'])->name('worker.index');
+    Route::get('/worker/live-status', [WorkerWorkspaceController::class, 'live'])->name('worker.live-status');
+    Route::get('/reports', ReportsController::class)->name('reports.index');
     Route::post('/worker/start', [WorkerRuntimeController::class, 'start'])->name('worker.start');
     Route::post('/worker/stop', [WorkerRuntimeController::class, 'stop'])->name('worker.stop');
 

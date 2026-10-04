@@ -273,7 +273,7 @@
                     <p class="eyebrow">System readiness</p>
                     <h3>Build progress</h3>
                 </div>
-                <span class="readiness-score">2 / 5</span>
+                <span class="readiness-score">4 / 5</span>
             </header>
 
             <div class="readiness-list">
@@ -291,25 +291,25 @@
                         <small>Authentication and responsive dashboard</small>
                     </div>
                 </div>
-                <div class="readiness-item">
-                    <span class="readiness-index">03</span>
+                <div class="readiness-item complete">
+                    <span class="readiness-check">✓</span>
                     <div>
                         <strong>Lead discovery</strong>
-                        <small>Next product milestone</small>
+                        <small>Discovery, analysis, contact finding, deduplication</small>
                     </div>
                 </div>
-                <div class="readiness-item">
-                    <span class="readiness-index">04</span>
+                <div class="readiness-item complete">
+                    <span class="readiness-check">✓</span>
                     <div>
                         <strong>Outreach review</strong>
-                        <small>Draft approval and suppression controls</small>
+                        <small>Draft approval, rejection, and controlled sending</small>
                     </div>
                 </div>
                 <div class="readiness-item">
                     <span class="readiness-index">05</span>
                     <div>
                         <strong>Delivery & replies</strong>
-                        <small>Email, bounce, unsubscribe, reply handling</small>
+                        <small>Email delivery is live; reply automation remains</small>
                     </div>
                 </div>
             </div>
@@ -379,8 +379,8 @@
                             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4M11 8v6M8 11h6"/></svg>
                         </span>
                         <strong>No leads discovered yet</strong>
-                        <p>The discovery engine will populate this stream after the next product milestone is connected.</p>
-                        <span class="empty-status">Discovery not connected yet</span>
+                        <p>The worker will populate this stream when an active campaign discovers new businesses.</p>
+                        <span class="empty-status">Waiting for discovery</span>
                     </div>
                 @endforelse
             </div>

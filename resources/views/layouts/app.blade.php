@@ -71,25 +71,23 @@
 
             <div class="nav-section">Automation</div>
 
-            <span class="nav-link disabled" aria-disabled="true">
+            <a class="nav-link {{ request()->routeIs('worker.*') ? 'active' : '' }}" href="{{ route('worker.index') }}">
                 <span class="nav-link-main">
                     <span class="nav-icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M12 7V3M8 7h8"/><circle cx="8" cy="16" r="1"/><circle cx="16" cy="16" r="1"/></svg>
                     </span>
                     <span>Worker</span>
                 </span>
-                <small>Soon</small>
-            </span>
+            </a>
 
-            <span class="nav-link disabled" aria-disabled="true">
+            <a class="nav-link {{ request()->routeIs('reports.*') ? 'active' : '' }}" href="{{ route('reports.index') }}">
                 <span class="nav-link-main">
                     <span class="nav-icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>
                     </span>
                     <span>Reports</span>
                 </span>
-                <small>Soon</small>
-            </span>
+            </a>
         </nav>
 
         <div class="sidebar-footer">
