@@ -10,6 +10,7 @@ use App\Models\OutreachMessage;
 use App\Models\SenderAccount;
 use App\Models\Suppression;
 use App\Services\Outreach\ApprovedEmailDeliveryService;
+use App\Services\Outreach\DeliveryAutomationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -135,6 +136,12 @@ class WorkerDeliveryController extends Controller
         }
 
         return false;
+    }
+
+    public function runAutomation(
+        DeliveryAutomationService $automationService,
+    ): JsonResponse {
+        return response()->json($automationService->run());
     }
 
     public function send(
