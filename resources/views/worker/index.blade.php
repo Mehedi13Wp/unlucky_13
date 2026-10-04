@@ -140,9 +140,8 @@
                 </div>
                 <button class="button button-secondary button-small" type="button" id="worker-refresh">Refresh</button>
             </header>
-            <pre id="worker-stdout">@forelse ($stdoutLines as $line){{ $line }}
-@emptyNo worker output has been recorded yet.
-@endforelse</pre>
+            <pre id="worker-stdout">@if (empty($stdoutLines))No worker output has been recorded yet.@else@foreach ($stdoutLines as $line){{ $line }}
+@endforeach@endif</pre>
         </article>
 
         <article class="worker-panel worker-log-panel">
@@ -152,9 +151,8 @@
                     <h3>Recent error log</h3>
                 </div>
             </header>
-            <pre id="worker-stderr">@forelse ($stderrLines as $line){{ $line }}
-@emptyNo worker errors recorded.
-@endforelse</pre>
+            <pre id="worker-stderr">@if (empty($stderrLines))No worker errors recorded.@else@foreach ($stderrLines as $line){{ $line }}
+@endforeach@endif</pre>
         </article>
     </section>
 @endsection
