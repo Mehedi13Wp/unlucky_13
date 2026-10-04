@@ -57,6 +57,6 @@ class DashboardTest extends TestCase
             ->assertOk()
             ->assertSee('Build your first focused outreach campaign.')
             ->assertSee('Create first campaign')
-            ->assertSee('Discovery not connected yet');
+            ->assertSee('Waiting for discovery');
     }
 }
