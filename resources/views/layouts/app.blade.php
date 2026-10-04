@@ -60,15 +60,14 @@
                 </span>
             </a>
 
-            <span class="nav-link disabled" aria-disabled="true">
+            <a class="nav-link {{ request()->routeIs('review-queue.*') ? 'active' : '' }}" href="{{ route('review-queue.index') }}">
                 <span class="nav-link-main">
                     <span class="nav-icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1 2-2V5a2 2 0 0 1 2-2h11"/></svg>
                     </span>
                     <span>Review Queue</span>
                 </span>
-                <small>Soon</small>
-            </span>
+            </a>
 
             <div class="nav-section">Automation</div>
 

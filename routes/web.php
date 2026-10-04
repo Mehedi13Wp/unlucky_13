@@ -6,6 +6,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DashboardLiveStatusController;
 use App\Http\Controllers\LeadController;
 use App\Http\Controllers\OutreachDraftController;
+use App\Http\Controllers\ReviewQueueController;
 use App\Http\Controllers\WorkerRuntimeController;
 use Illuminate\Support\Facades\Route;
 
@@ -35,6 +36,9 @@ Route::middleware('auth')->group(function (): void {
 
     Route::resource('leads', LeadController::class)
         ->only(['index', 'create', 'store', 'show']);
+
+    Route::get('/review-queue', ReviewQueueController::class)
+        ->name('review-queue.index');
 
     Route::patch(
         '/leads/{lead}/outreach-drafts/{outreachDraft}/approve',
