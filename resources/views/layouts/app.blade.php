@@ -71,6 +71,15 @@
 
             <div class="nav-section">Automation</div>
 
+            <a class="nav-link {{ request()->routeIs('sender-accounts.*') ? 'active' : '' }}" href="{{ route('sender-accounts.index') }}">
+                <span class="nav-link-main">
+                    <span class="nav-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="m4 7 8 6 8-6"/><path d="M8 17h8"/></svg>
+                    </span>
+                    <span>Sender Pool</span>
+                </span>
+            </a>
+
             <a class="nav-link {{ request()->routeIs('worker.*') ? 'active' : '' }}" href="{{ route('worker.index') }}">
                 <span class="nav-link-main">
                     <span class="nav-icon" aria-hidden="true">
