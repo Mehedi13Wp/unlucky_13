@@ -8,6 +8,7 @@ use App\Http\Controllers\LeadController;
 use App\Http\Controllers\OutreachDraftController;
 use App\Http\Controllers\ReviewQueueController;
 use App\Http\Controllers\ReportsController;
+use App\Http\Controllers\SenderAccountController;
 use App\Http\Controllers\WorkerWorkspaceController;
 use App\Http\Controllers\WorkerRuntimeController;
 use Illuminate\Support\Facades\Route;
@@ -27,6 +28,11 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/worker', [WorkerWorkspaceController::class, 'index'])->name('worker.index');
     Route::get('/worker/live-status', [WorkerWorkspaceController::class, 'live'])->name('worker.live-status');
     Route::get('/reports', ReportsController::class)->name('reports.index');
+    Route::get('/sender-accounts', [SenderAccountController::class, 'index'])->name('sender-accounts.index');
+    Route::post('/sender-accounts', [SenderAccountController::class, 'store'])->name('sender-accounts.store');
+    Route::post('/sender-accounts/import', [SenderAccountController::class, 'import'])->name('sender-accounts.import');
+    Route::patch('/sender-accounts/{senderAccount}/toggle', [SenderAccountController::class, 'toggle'])->name('sender-accounts.toggle');
+    Route::get('/sender-accounts/template.csv', [SenderAccountController::class, 'template'])->name('sender-accounts.template');
     Route::post('/worker/start', [WorkerRuntimeController::class, 'start'])->name('worker.start');
     Route::post('/worker/stop', [WorkerRuntimeController::class, 'stop'])->name('worker.stop');
 
