@@ -3,13 +3,14 @@ from __future__ import annotations
 import ipaddress
 import re
 import socket
+import ssl
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 from html.parser import HTMLParser
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlparse
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.request import HTTPRedirectHandler, HTTPSHandler, Request, build_opener
 
 
 class AnalyzerError(RuntimeError):
@@ -159,7 +160,27 @@ class WebsiteFetcher:
     def __init__(self, timeout_seconds: float = 15.0, max_bytes: int = 1_000_000) -> None:
         self.timeout_seconds = timeout_seconds
         self.max_bytes = max_bytes
-        self.opener = build_opener(_SafeRedirectHandler())
+        self.ssl_context = self._ssl_context()
+        self.opener = build_opener(
+            HTTPSHandler(context=self.ssl_context),
+            _SafeRedirectHandler(),
+        )
+
+    @staticmethod
+    def _ssl_context() -> ssl.SSLContext:
+        try:
+            import truststore
+
+            return truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        except ImportError:
+            pass
+
+        try:
+            import certifi
+
+            return ssl.create_default_context(cafile=certifi.where())
+        except ImportError:
+            return ssl.create_default_context()
 
     def fetch(self, url: str) -> WebsiteSnapshot:
         ensure_public_url(url)
@@ -203,6 +224,14 @@ class WebsiteFetcher:
             raise AnalyzerError(f"Website returned HTTP {error.code}.") from error
         except (URLError, TimeoutError) as error:
             reason = getattr(error, "reason", None) or str(error) or "request timed out"
+            reason_text = str(reason)
+
+            if "CERTIFICATE_VERIFY_FAILED" in reason_text:
+                raise AnalyzerError(
+                    "Website TLS certificate verification failed. "
+                    "Install worker dependencies so Windows system certificates can be used."
+                ) from error
+
             raise AnalyzerError(f"Website request failed: {reason}") from error
 
 

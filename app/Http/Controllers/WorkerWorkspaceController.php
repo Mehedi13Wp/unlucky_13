@@ -18,11 +18,16 @@ class WorkerWorkspaceController extends Controller
         $workerStatus = $workerManager->status();
         $activity = $activityService->snapshot($request->user(), $workerStatus);
 
+        $stdoutPath = storage_path('logs/unlucky13-dashboard-worker.log');
+        $stderrPath = storage_path('logs/unlucky13-dashboard-worker-error.log');
+
         return view('worker.index', [
             'workerStatus' => $workerStatus,
             'activity' => $activity,
-            'stdoutLines' => $this->tailLog(storage_path('logs/unlucky13-dashboard-worker.log')),
-            'stderrLines' => $this->tailLog(storage_path('logs/unlucky13-dashboard-worker-error.log')),
+            'stdoutLines' => $this->tailLog($stdoutPath),
+            'stderrLines' => $this->tailLog($stderrPath),
+            'stdoutMeta' => $this->logMeta($stdoutPath, $workerStatus['started_at'] ?? null),
+            'stderrMeta' => $this->logMeta($stderrPath, $workerStatus['started_at'] ?? null),
         ]);
     }
 
@@ -33,13 +38,42 @@ class WorkerWorkspaceController extends Controller
     ): JsonResponse {
         $workerStatus = $workerManager->status();
 
+        $stdoutPath = storage_path('logs/unlucky13-dashboard-worker.log');
+        $stderrPath = storage_path('logs/unlucky13-dashboard-worker-error.log');
+
         return response()->json([
             'worker' => $workerStatus,
             'activity' => $activityService->snapshot($request->user(), $workerStatus),
-            'stdout' => $this->tailLog(storage_path('logs/unlucky13-dashboard-worker.log')),
-            'stderr' => $this->tailLog(storage_path('logs/unlucky13-dashboard-worker-error.log')),
+            'stdout' => $this->tailLog($stdoutPath),
+            'stderr' => $this->tailLog($stderrPath),
+            'stdout_meta' => $this->logMeta($stdoutPath, $workerStatus['started_at'] ?? null),
+            'stderr_meta' => $this->logMeta($stderrPath, $workerStatus['started_at'] ?? null),
             'refreshed_at' => now()->toISOString(),
         ]);
+    }
+
+    private function logMeta(string $path, ?string $startedAt): array
+    {
+        if (! is_file($path)) {
+            return [
+                'exists' => false,
+                'modified_at' => null,
+                'is_current_session' => false,
+                'size_bytes' => 0,
+            ];
+        }
+
+        $modified = filemtime($path);
+        $started = $startedAt ? strtotime($startedAt) : false;
+
+        return [
+            'exists' => true,
+            'modified_at' => $modified !== false ? date(DATE_ATOM, $modified) : null,
+            'is_current_session' => $modified !== false
+                && $started !== false
+                && $modified >= $started,
+            'size_bytes' => (int) (filesize($path) ?: 0),
+        ];
     }
 
     private function tailLog(string $path, int $maxLines = 80, int $maxBytes = 65536): array

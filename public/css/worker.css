@@ -279,3 +279,49 @@
         width: 100%;
     }
 }
+
+
+.worker-log-tools,
+.worker-log-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.worker-live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: #8bd1a4;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.worker-live-badge > span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 0 5px rgba(74, 196, 124, .08);
+}
+
+.worker-log-status {
+    justify-content: space-between;
+    padding: 9px 19px;
+    border-bottom: 1px solid var(--border-soft);
+    background: rgba(9, 21, 14, .82);
+    color: var(--muted);
+    font-size: 14px;
+}
+
+#worker-stderr-status {
+    color: #d8b878;
+}
+
+@media (max-width: 620px) {
+    .worker-log-tools,
+    .worker-log-status {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}

@@ -138,8 +138,17 @@
                     <p class="eyebrow">Worker output</p>
                     <h3>Recent activity log</h3>
                 </div>
-                <button class="button button-secondary button-small" type="button" id="worker-refresh">Refresh</button>
+                <div class="worker-log-tools">
+                    <span class="worker-live-badge"><span></span> Live</span>
+                    <button class="button button-secondary button-small" type="button" id="worker-refresh">Refresh now</button>
+                </div>
             </header>
+            <div class="worker-log-status">
+                <span id="worker-last-refreshed">Auto-refreshing every 5 seconds</span>
+                <span id="worker-stdout-status">
+                    {{ ($stdoutMeta['is_current_session'] ?? false) ? 'Current worker session' : 'No current-session output yet' }}
+                </span>
+            </div>
             <pre id="worker-stdout">{{ empty($stdoutLines) ? 'No worker output has been recorded yet.' : implode("\n", $stdoutLines) }}</pre>
         </article>
 
@@ -150,6 +159,18 @@
                     <h3>Recent error log</h3>
                 </div>
             </header>
+            <div class="worker-log-status">
+                <span>Error stream</span>
+                <span id="worker-stderr-status">
+                    @if (empty($stderrLines))
+                        No errors in the current log
+                    @elseif ($stderrMeta['is_current_session'] ?? false)
+                        Current-session errors detected
+                    @else
+                        Historical errors from an older run
+                    @endif
+                </span>
+            </div>
             <pre id="worker-stderr">{{ empty($stderrLines) ? 'No worker errors recorded.' : implode("\n", $stderrLines) }}</pre>
         </article>
     </section>
@@ -166,6 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const liveUrl = root.dataset.liveUrl;
     const refreshButton = document.getElementById('worker-refresh');
+    const refreshedNode = document.getElementById('worker-last-refreshed');
 
     const setText = (id, value) => {
         const node = document.getElementById(id);
@@ -230,10 +252,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
         renderLines('worker-stdout', payload.stdout, 'No worker output has been recorded yet.');
         renderLines('worker-stderr', payload.stderr, 'No worker errors recorded.');
+
+        const stdoutMeta = payload.stdout_meta || {};
+        const stderrMeta = payload.stderr_meta || {};
+        setText(
+            'worker-stdout-status',
+            stdoutMeta.is_current_session ? 'Current worker session' : 'No current-session output yet'
+        );
+        setText(
+            'worker-stderr-status',
+            Array.isArray(payload.stderr) && payload.stderr.length
+                ? (stderrMeta.is_current_session ? 'Current-session errors detected' : 'Historical errors from an older run')
+                : 'No errors in the current log'
+        );
+
+        if (refreshedNode) {
+            const now = new Date();
+            refreshedNode.textContent = 'Updated ' + now.toLocaleTimeString();
+        }
     };
 
     const refresh = async () => {
-        if (refreshButton) refreshButton.disabled = true;
+        if (refreshButton) {
+            refreshButton.disabled = true;
+            refreshButton.textContent = 'Refreshing...';
+        }
         try {
             const response = await fetch(liveUrl, {
                 headers: {
@@ -248,12 +291,15 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             // Keep the last successful snapshot visible.
         } finally {
-            if (refreshButton) refreshButton.disabled = false;
+            if (refreshButton) {
+                refreshButton.disabled = false;
+                refreshButton.textContent = 'Refresh now';
+            }
         }
     };
 
     if (refreshButton) refreshButton.addEventListener('click', refresh);
-    window.setInterval(refresh, 15000);
+    window.setInterval(refresh, 5000);
     window.setTimeout(refresh, 1200);
 });
 </script>

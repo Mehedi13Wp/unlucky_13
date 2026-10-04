@@ -52,6 +52,7 @@ class LocalWorkerManager
                 ? (int) $state['pid']
                 : null,
             'message' => (string) ($state['message'] ?? 'Worker status updated.'),
+            'started_at' => $state['started_at'] ?? null,
             'heartbeat_at' => $state['heartbeat_at'] ?? null,
             'heartbeat_age_seconds' => $heartbeatAge,
             'last_cycle_at' => $state['last_cycle_at'] ?? null,
@@ -78,16 +79,22 @@ class LocalWorkerManager
         $this->ensureRuntimeDirectories();
         @unlink($this->stopPath());
 
-        $this->writeState([
-            'state' => 'starting',
-            'pid' => null,
-            'heartbeat_at' => gmdate('c'),
-            'message' => 'Worker is starting.',
-        ]);
-
         $workerScript = base_path('worker/run.py');
         $stdout = storage_path('logs/unlucky13-dashboard-worker.log');
         $stderr = storage_path('logs/unlucky13-dashboard-worker-error.log');
+
+        $this->rotateLog($stdout);
+        $this->rotateLog($stderr);
+
+        $startedAt = gmdate('c');
+
+        $this->writeState([
+            'state' => 'starting',
+            'pid' => null,
+            'started_at' => $startedAt,
+            'heartbeat_at' => $startedAt,
+            'message' => 'Worker is starting.',
+        ]);
 
         if (! is_file($workerScript)) {
             $this->writeState([
@@ -101,7 +108,7 @@ class LocalWorkerManager
         }
 
         $command = sprintf(
-            'cmd.exe /D /C start "" /B python %s work --managed 1>>%s 2>>%s',
+            'cmd.exe /D /C start "" /B python -u %s work --managed 1>>%s 2>>%s',
             $this->quoteWindows($workerScript),
             $this->quoteWindows($stdout),
             $this->quoteWindows($stderr),
@@ -128,7 +135,8 @@ class LocalWorkerManager
             'state' => 'starting',
             'pid' => null,
             'message' => 'Worker is starting in the background.',
-            'heartbeat_at' => gmdate('c'),
+            'started_at' => $startedAt,
+            'heartbeat_at' => $startedAt,
             'heartbeat_age_seconds' => 0,
             'last_cycle_at' => $status['last_cycle_at'] ?? null,
             'last_cycle' => $status['last_cycle'] ?? [],
@@ -177,6 +185,7 @@ class LocalWorkerManager
             'state' => 'stopped',
             'pid' => null,
             'message' => $message,
+            'started_at' => $state['started_at'] ?? null,
             'heartbeat_at' => $state['heartbeat_at'] ?? null,
             'heartbeat_age_seconds' => null,
             'last_cycle_at' => $state['last_cycle_at'] ?? null,
@@ -247,6 +256,17 @@ class LocalWorkerManager
     private function stopPath(): string
     {
         return storage_path('app/worker-runtime/worker-stop.request');
+    }
+
+    private function rotateLog(string $path): void
+    {
+        if (! is_file($path) || filesize($path) === 0) {
+            return;
+        }
+
+        $previous = $path.'.previous';
+        @unlink($previous);
+        @rename($path, $previous);
     }
 
     private function quoteWindows(string $value): string
