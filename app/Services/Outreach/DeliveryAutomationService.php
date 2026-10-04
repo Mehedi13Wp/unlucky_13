@@ -60,6 +60,18 @@ class DeliveryAutomationService
                 return ['status' => 'disabled'];
             }
 
+            if (
+                $setting->last_status === 'checking_queue'
+                && $setting->last_attempt_at !== null
+                && now()->lessThan($setting->last_attempt_at->copy()->addMinutes(2))
+            ) {
+                return [
+                    'status' => 'busy',
+                    'user_id' => $setting->user_id,
+                    'message' => 'Another automatic delivery check is already in progress.',
+                ];
+            }
+
             if ($setting->session_ends_at === null || now()->greaterThanOrEqualTo($setting->session_ends_at)) {
                 $setting->update([
                     'enabled' => false,
