@@ -29,4 +29,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(Campaign::class);
     }
+
+    public function senderAccounts(): HasMany
+    {
+        return $this->hasMany(SenderAccount::class);
+    }
 }
