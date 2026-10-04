@@ -33,6 +33,8 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/sender-accounts/import', [SenderAccountController::class, 'import'])->name('sender-accounts.import');
     Route::patch('/sender-accounts/{senderAccount}/toggle', [SenderAccountController::class, 'toggle'])->name('sender-accounts.toggle');
     Route::get('/sender-accounts/template.csv', [SenderAccountController::class, 'template'])->name('sender-accounts.template');
+    Route::post('/sender-accounts/automation/start', [SenderAccountController::class, 'startAutomation'])->name('sender-accounts.automation.start');
+    Route::post('/sender-accounts/automation/stop', [SenderAccountController::class, 'stopAutomation'])->name('sender-accounts.automation.stop');
     Route::post('/worker/start', [WorkerRuntimeController::class, 'start'])->name('worker.start');
     Route::post('/worker/stop', [WorkerRuntimeController::class, 'stop'])->name('worker.stop');
 
