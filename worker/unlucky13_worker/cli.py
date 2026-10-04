@@ -6,6 +6,7 @@ import sys
 import time
 from urllib.parse import urlparse
 
+from .analysis_telemetry import write_analysis_telemetry
 from .candidates import load_candidates
 from .client import WorkerApiClient, WorkerApiError
 from .contact_discovery import ContactDiscoveryError, ContactFinder
@@ -495,10 +496,35 @@ def main(argv: list[str] | None = None) -> int:
                         )
                         submitted += 1
 
-                except (ContactDiscoveryError, WorkerApiError, ValueError) as error:
+                except ContactDiscoveryError as error:
+                    print(
+                        f"[{index}/{len(leads)}] skipped contact inspection: "
+                        f"{lead.get('business_name')} - {error}"
+                    )
+
+                    if not args.dry_run:
+                        try:
+                            client.complete_contact_discovery(
+                                lead["uuid"],
+                                [],
+                                [
+                                    "Contact discovery skipped because the public website "
+                                    f"could not be inspected: {error}"
+                                ],
+                            )
+                            submitted += 1
+                        except WorkerApiError as api_error:
+                            failed += 1
+                            print(
+                                f"[{index}/{len(leads)}] system error while recording "
+                                f"contact skip: {lead.get('business_name')} - {api_error}",
+                                file=sys.stderr,
+                            )
+
+                except (WorkerApiError, ValueError) as error:
                     failed += 1
                     print(
-                        f"[{index}/{len(leads)}] failed: "
+                        f"[{index}/{len(leads)}] system error: "
                         f"{lead.get('business_name')} - {error}",
                         file=sys.stderr,
                     )
@@ -660,10 +686,20 @@ def main(argv: list[str] | None = None) -> int:
 
             if not leads:
                 print("No leads are waiting for analysis.")
+                if not args.dry_run:
+                    write_analysis_telemetry(
+                        {
+                            "queued": 0,
+                            "completed": 0,
+                            "skipped": 0,
+                            "failed": 0,
+                        }
+                    )
                 return 0
 
             analyzer = WebsiteAnalyzer(timeout_seconds=config.timeout_seconds)
             completed = 0
+            skipped = 0
             failed = 0
 
             for index, lead in enumerate(leads, start=1):
@@ -691,10 +727,42 @@ def main(argv: list[str] | None = None) -> int:
                         print(f"  submitted: {decision}")
                         completed += 1
 
-                except (AnalyzerError, WorkerApiError, ValueError) as error:
+                except AnalyzerError as error:
+                    skipped += 1
+                    print(
+                        f"[{index}/{len(leads)}] skipped: "
+                        f"{lead.get('business_name')} - {error}"
+                    )
+
+                    if not args.dry_run:
+                        try:
+                            client.start_analysis(lead["uuid"])
+                            response = client.complete_analysis(
+                                lead["uuid"],
+                                0,
+                                (
+                                    "Website inspection was skipped because the public site "
+                                    f"could not be fetched safely: {error}"
+                                ),
+                                [
+                                    "Website inspection unavailable; lead was not scored from "
+                                    "unverified content."
+                                ],
+                            )
+                            decision = response.get("decision") or response.get("status")
+                            print(f"  recorded as: {decision}")
+                        except WorkerApiError as api_error:
+                            failed += 1
+                            print(
+                                f"[{index}/{len(leads)}] system error while recording skip: "
+                                f"{lead.get('business_name')} - {api_error}",
+                                file=sys.stderr,
+                            )
+
+                except (WorkerApiError, ValueError) as error:
                     failed += 1
                     print(
-                        f"[{index}/{len(leads)}] failed: "
+                        f"[{index}/{len(leads)}] system error: "
                         f"{lead.get('business_name')} - {error}",
                         file=sys.stderr,
                     )
@@ -703,8 +771,20 @@ def main(argv: list[str] | None = None) -> int:
                     time.sleep(max(0.5, min(args.delay, 10.0)))
 
             print(
-                f"Finished. analyzed={len(leads)} submitted={completed} failed={failed}"
+                f"Finished. queued={len(leads)} completed={completed} "
+                f"skipped={skipped} system_errors={failed}"
             )
+
+            if not args.dry_run:
+                write_analysis_telemetry(
+                    {
+                        "queued": len(leads),
+                        "completed": completed,
+                        "skipped": skipped,
+                        "failed": failed,
+                    }
+                )
+
             return 1 if failed else 0
 
         candidates = load_candidates(args.file)[: max(1, min(args.limit, 100))]

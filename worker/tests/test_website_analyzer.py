@@ -3,6 +3,7 @@ import unittest
 from worker.unlucky13_worker.website_analyzer import (
     AnalyzerError,
     WebsiteAnalyzer,
+    WebsiteFetcher,
     WebsiteSnapshot,
     ensure_public_url,
 )
@@ -33,6 +34,24 @@ class WebsiteAnalyzerTest(unittest.TestCase):
             with self.subTest(url=url):
                 with self.assertRaises(AnalyzerError):
                     ensure_public_url(url)
+
+    def test_fetcher_builds_www_and_apex_fallbacks_without_downgrading_https(self):
+        self.assertEqual(
+            [
+                "https://agency.example/contact?from=home",
+                "https://www.agency.example/contact?from=home",
+            ],
+            WebsiteFetcher.candidate_urls(
+                "https://agency.example/contact?from=home"
+            ),
+        )
+        self.assertEqual(
+            [
+                "https://www.agency.example",
+                "https://agency.example",
+            ],
+            WebsiteFetcher.candidate_urls("https://www.agency.example"),
+        )
 
     def test_scores_observed_public_signals(self):
         html = """

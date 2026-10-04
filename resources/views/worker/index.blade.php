@@ -129,6 +129,29 @@
                 Worker automation handles discovery, website analysis, contact discovery, and draft generation. Approved email sending remains a human action.
             </p>
         </article>
+
+        <article class="worker-panel">
+            <header>
+                <div>
+                    <p class="eyebrow">Analysis snapshot</p>
+                    <h3>Last analysis batch</h3>
+                </div>
+                <span class="worker-health {{ ($analysisTelemetry['failed'] ?? 0) > 0 ? 'attention' : 'good' }}" id="analysis-health">
+                    {{ ($analysisTelemetry['failed'] ?? 0) > 0 ? 'System errors' : 'Healthy' }}
+                </span>
+            </header>
+
+            <div class="worker-cycle-grid worker-cycle-grid-four">
+                <div><span>Queued</span><strong id="analysis-queued">{{ $analysisTelemetry['queued'] ?? 0 }}</strong></div>
+                <div><span>Completed</span><strong id="analysis-completed">{{ $analysisTelemetry['completed'] ?? 0 }}</strong></div>
+                <div><span>Skipped sites</span><strong id="analysis-skipped">{{ $analysisTelemetry['skipped'] ?? 0 }}</strong></div>
+                <div><span>System errors</span><strong id="analysis-failed">{{ $analysisTelemetry['failed'] ?? 0 }}</strong></div>
+            </div>
+
+            <p class="worker-note">
+                A blocked, broken, unreachable, or certificate-mismatched website is counted as Skipped, not as a worker failure. Only API or internal processing problems count as System errors.
+            </p>
+        </article>
     </section>
 
     <section class="worker-log-grid">
@@ -230,6 +253,20 @@ document.addEventListener('DOMContentLoaded', () => {
         setText('discovery-fresh', activity.discovery_fresh ?? 0);
         setText('discovery-duplicates', activity.discovery_duplicates_skipped ?? 0);
         setText('discovery-errors', activity.discovery_failed ?? 0);
+
+        const analysis = payload.analysis || {};
+        setText('analysis-queued', analysis.queued ?? 0);
+        setText('analysis-completed', analysis.completed ?? 0);
+        setText('analysis-skipped', analysis.skipped ?? 0);
+        setText('analysis-failed', analysis.failed ?? 0);
+
+        const analysisHealth = document.getElementById('analysis-health');
+        if (analysisHealth) {
+            const analysisFailures = Number(analysis.failed || 0);
+            analysisHealth.textContent = analysisFailures > 0 ? 'System errors' : 'Healthy';
+            analysisHealth.classList.toggle('attention', analysisFailures > 0);
+            analysisHealth.classList.toggle('good', analysisFailures === 0);
+        }
 
         const dot = document.getElementById('workspace-state-dot');
         if (dot) {

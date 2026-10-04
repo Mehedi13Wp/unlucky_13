@@ -28,6 +28,7 @@ class WorkerWorkspaceController extends Controller
             'stderrLines' => $this->tailLog($stderrPath),
             'stdoutMeta' => $this->logMeta($stdoutPath, $workerStatus['started_at'] ?? null),
             'stderrMeta' => $this->logMeta($stderrPath, $workerStatus['started_at'] ?? null),
+            'analysisTelemetry' => $this->analysisTelemetry(),
         ]);
     }
 
@@ -48,8 +49,45 @@ class WorkerWorkspaceController extends Controller
             'stderr' => $this->tailLog($stderrPath),
             'stdout_meta' => $this->logMeta($stdoutPath, $workerStatus['started_at'] ?? null),
             'stderr_meta' => $this->logMeta($stderrPath, $workerStatus['started_at'] ?? null),
+            'analysis' => $this->analysisTelemetry(),
             'refreshed_at' => now()->toISOString(),
         ]);
+    }
+
+    private function analysisTelemetry(): array
+    {
+        $path = storage_path('app/worker-runtime/last-analysis.json');
+
+        if (! is_file($path) || ! is_readable($path)) {
+            return [
+                'attempted_at' => null,
+                'queued' => 0,
+                'completed' => 0,
+                'skipped' => 0,
+                'failed' => 0,
+            ];
+        }
+
+        $contents = @file_get_contents($path);
+        $decoded = is_string($contents) ? json_decode($contents, true) : null;
+
+        if (! is_array($decoded)) {
+            return [
+                'attempted_at' => null,
+                'queued' => 0,
+                'completed' => 0,
+                'skipped' => 0,
+                'failed' => 0,
+            ];
+        }
+
+        return [
+            'attempted_at' => $decoded['attempted_at'] ?? null,
+            'queued' => (int) ($decoded['queued'] ?? 0),
+            'completed' => (int) ($decoded['completed'] ?? 0),
+            'skipped' => (int) ($decoded['skipped'] ?? 0),
+            'failed' => (int) ($decoded['failed'] ?? 0),
+        ];
     }
 
     private function logMeta(string $path, ?string $startedAt): array

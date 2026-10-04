@@ -44,6 +44,9 @@ class WorkerWorkspaceTest extends TestCase
             ->assertSee('RUNNING')
             ->assertSee('Recent activity log')
             ->assertSee('Recent error log')
+            ->assertSee('Last analysis batch')
+            ->assertSee('Skipped sites')
+            ->assertSee('System errors')
             ->assertSee('Start Worker')
             ->assertSee('Stop Worker');
     }

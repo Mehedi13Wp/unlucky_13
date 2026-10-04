@@ -182,15 +182,71 @@ class WebsiteFetcher:
         except ImportError:
             return ssl.create_default_context()
 
+    @staticmethod
+    def candidate_urls(url: str) -> list[str]:
+        parsed = urlparse(url)
+        hostname = (parsed.hostname or "").lower().rstrip(".")
+
+        if not hostname:
+            return [url]
+
+        candidates = [url]
+
+        try:
+            ipaddress.ip_address(hostname)
+            return candidates
+        except ValueError:
+            pass
+
+        alternate_host = hostname[4:] if hostname.startswith("www.") else "www." + hostname
+        port = f":{parsed.port}" if parsed.port is not None else ""
+        alternate_netloc = alternate_host + port
+
+        alternate = parsed._replace(netloc=alternate_netloc).geturl()
+
+        if alternate not in candidates:
+            candidates.append(alternate)
+
+        return candidates
+
     def fetch(self, url: str) -> WebsiteSnapshot:
+        errors: list[str] = []
+
+        for candidate in self.candidate_urls(url):
+            try:
+                return self._fetch_with_retry(candidate)
+            except AnalyzerError as error:
+                errors.append(f"{candidate}: {error}")
+
+        detail = " | ".join(errors[-2:]) if errors else "unknown website error"
+        raise AnalyzerError(
+            "Website could not be inspected after safe host retries. " + detail
+        )
+
+    def _fetch_with_retry(self, url: str) -> WebsiteSnapshot:
+        try:
+            return self._fetch_once(url)
+        except AnalyzerError as error:
+            if not self._is_retryable_server_error(str(error)):
+                raise
+
+        return self._fetch_once(url)
+
+    def _fetch_once(self, url: str) -> WebsiteSnapshot:
         ensure_public_url(url)
 
         request = Request(
             url,
             method="GET",
             headers={
-                "Accept": "text/html,application/xhtml+xml",
-                "User-Agent": "Unlucky13-Website-Analyzer/0.1 (+single-page public inspection)",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Cache-Control": "no-cache",
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/129.0.0.0 Safari/537.36"
+                ),
             },
         )
 
@@ -228,11 +284,15 @@ class WebsiteFetcher:
 
             if "CERTIFICATE_VERIFY_FAILED" in reason_text:
                 raise AnalyzerError(
-                    "Website TLS certificate verification failed. "
-                    "Install worker dependencies so Windows system certificates can be used."
+                    "Website TLS certificate verification failed."
                 ) from error
 
             raise AnalyzerError(f"Website request failed: {reason}") from error
+
+    @staticmethod
+    def _is_retryable_server_error(message: str) -> bool:
+        match = re.search(r"Website returned HTTP (5\\d\\d)", message)
+        return bool(match)
 
 
 def _normalize(value: Any) -> str:
