@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\CampaignStatus;
+use App\Models\DeliveryAutomationSetting;
+use App\Models\OutreachDraft;
 use App\Models\OutreachMessage;
 use App\Models\SenderAccount;
 use Illuminate\Http\RedirectResponse;
@@ -41,6 +44,38 @@ class SenderAccountController extends Controller
             ];
         });
 
+        $automation = $request->user()->deliveryAutomationSetting
+            ?? new DeliveryAutomationSetting([
+                'global_daily_limit' => 20,
+                'interval_minutes' => 15,
+                'session_hours' => 5,
+                'enabled' => false,
+            ]);
+
+        $sentTodayGlobal = OutreachMessage::query()
+            ->whereHas(
+                'campaign',
+                fn ($query) => $query->where('user_id', $request->user()->id),
+            )
+            ->where('status', OutreachMessage::STATUS_SENT)
+            ->whereBetween('sent_at', [$todayStart, $todayEnd])
+            ->count();
+
+        $approvedQueue = OutreachDraft::query()
+            ->where('status', OutreachDraft::STATUS_APPROVED)
+            ->where('channel', 'email')
+            ->whereHas(
+                'lead.campaign',
+                fn ($query) => $query
+                    ->where('user_id', $request->user()->id)
+                    ->where('status', CampaignStatus::Active->value),
+            )
+            ->whereDoesntHave(
+                'message',
+                fn ($query) => $query->where('status', OutreachMessage::STATUS_SENT),
+            )
+            ->count();
+
         return view('sender-accounts.index', [
             'rows' => $rows,
             'stats' => [
@@ -49,6 +84,15 @@ class SenderAccountController extends Controller
                 'limit_reached' => $rows->where('status', 'limit_reached')->count(),
                 'disabled' => $rows->where('status', 'disabled')->count(),
                 'remaining_today' => $rows->sum('remaining_today'),
+            ],
+            'automation' => $automation,
+            'automationStats' => [
+                'sent_today' => $sentTodayGlobal,
+                'approved_queue' => $approvedQueue,
+                'remaining_today' => max(
+                    0,
+                    (int) $automation->global_daily_limit - $sentTodayGlobal,
+                ),
             ],
         ]);
     }
@@ -188,6 +232,57 @@ class SenderAccountController extends Controller
             'success',
             $senderAccount->enabled ? 'Sender enabled.' : 'Sender disabled.',
         );
+    }
+
+    public function startAutomation(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'global_daily_limit' => ['required', 'integer', 'between:1,100'],
+            'interval_minutes' => ['required', 'integer', 'between:5,120'],
+            'session_hours' => ['required', 'integer', 'between:1,12'],
+        ]);
+
+        if (! $request->user()->senderAccounts()->where('enabled', true)->exists()) {
+            return back()->with(
+                'error',
+                'Add and enable at least one sender account before starting automatic delivery.',
+            );
+        }
+
+        $request->user()->deliveryAutomationSetting()->updateOrCreate(
+            ['user_id' => $request->user()->id],
+            [
+                'enabled' => true,
+                'global_daily_limit' => (int) $validated['global_daily_limit'],
+                'interval_minutes' => (int) $validated['interval_minutes'],
+                'session_hours' => (int) $validated['session_hours'],
+                'session_started_at' => now(),
+                'session_ends_at' => now()->addHours((int) $validated['session_hours']),
+                'last_attempt_at' => null,
+                'last_status' => 'active',
+                'last_message' => 'Automatic delivery session started. Only human-approved email drafts can be sent.',
+            ],
+        );
+
+        return back()->with(
+            'success',
+            'Automatic delivery session started. Review-before-send remains required.',
+        );
+    }
+
+    public function stopAutomation(Request $request): RedirectResponse
+    {
+        $setting = $request->user()->deliveryAutomationSetting;
+
+        if ($setting !== null) {
+            $setting->update([
+                'enabled' => false,
+                'last_status' => 'stopped',
+                'last_message' => 'Automatic delivery was stopped manually.',
+            ]);
+        }
+
+        return back()->with('success', 'Automatic delivery stopped.');
     }
 
     public function template(): StreamedResponse
