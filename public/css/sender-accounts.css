@@ -341,3 +341,121 @@
         flex-direction: column;
     }
 }
+
+
+.sender-automation-panel {
+    margin-top: 14px;
+}
+
+.automation-body {
+    display: grid;
+    gap: 14px;
+    padding: 18px 19px;
+}
+
+.automation-summary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 9px;
+}
+
+.automation-summary > div {
+    padding: 13px;
+    border: 1px solid var(--border-soft);
+    border-radius: 11px;
+    background: rgba(8, 19, 13, .5);
+}
+
+.automation-summary span,
+.automation-summary strong {
+    display: block;
+}
+
+.automation-summary span {
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.automation-summary strong {
+    margin-top: 5px;
+    color: var(--text-soft);
+    font-size: 18px;
+}
+
+.automation-message {
+    display: grid;
+    gap: 5px;
+    padding: 13px 14px;
+    border: 1px solid rgba(85, 158, 111, .18);
+    border-radius: 11px;
+    background: rgba(85, 158, 111, .05);
+}
+
+.automation-message strong {
+    font-size: 15px;
+}
+
+.automation-message span,
+.automation-rule {
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.automation-form {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+    align-items: end;
+    gap: 10px;
+}
+
+.automation-form label {
+    display: grid;
+    gap: 6px;
+}
+
+.automation-form label > span {
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 750;
+}
+
+.automation-form input {
+    width: 100%;
+    min-height: 44px;
+    padding: 0 11px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    outline: none;
+    background: #0c1812;
+    color: var(--text);
+    font-size: 16px;
+}
+
+.automation-actions,
+.automation-stop {
+    margin: 0;
+}
+
+.automation-rule {
+    margin: 0;
+}
+
+@media (max-width: 850px) {
+    .automation-summary,
+    .automation-form {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 560px) {
+    .automation-summary,
+    .automation-form {
+        grid-template-columns: 1fr;
+    }
+
+    .automation-actions .button,
+    .automation-stop .button {
+        width: 100%;
+    }
+}
