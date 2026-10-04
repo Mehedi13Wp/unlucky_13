@@ -237,24 +237,28 @@ class ApprovedEmailDeliveryService
         }
 
         try {
-            $mail = $senderAccount !== null
-                ? Mail::mailer('sender_pool')
-                : Mail::mailer($mailer);
-
-            $mail->raw(
-                $outreachDraft->body,
-                function ($message) use ($outreachDraft, $senderAccount): void {
-                    if ($senderAccount !== null) {
+            if ($senderAccount !== null) {
+                Mail::mailer('sender_pool')->raw(
+                    $outreachDraft->body,
+                    function ($message) use ($outreachDraft, $senderAccount): void {
                         $message->from(
                             $senderAccount->email,
                             $senderAccount->from_name ?: null,
                         );
-                    }
 
-                    $message->to($outreachDraft->recipient)
-                        ->subject((string) $outreachDraft->subject);
-                },
-            );
+                        $message->to($outreachDraft->recipient)
+                            ->subject((string) $outreachDraft->subject);
+                    },
+                );
+            } else {
+                Mail::raw(
+                    $outreachDraft->body,
+                    function ($message) use ($outreachDraft): void {
+                        $message->to($outreachDraft->recipient)
+                            ->subject((string) $outreachDraft->subject);
+                    },
+                );
+            }
         } catch (Throwable $error) {
             $message?->update([
                 'status' => OutreachMessage::STATUS_FAILED,
