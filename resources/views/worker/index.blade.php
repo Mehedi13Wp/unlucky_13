@@ -90,8 +90,8 @@
                     <p class="eyebrow">Latest scheduler cycle</p>
                     <h3>Pipeline health</h3>
                 </div>
-                <span id="workspace-cycle-health" class="worker-health {{ (($lastCycle['discovery_failed'] ?? 0) + ($lastCycle['pipeline_failed'] ?? 0)) > 0 ? 'attention' : 'good' }}">
-                    {{ (($lastCycle['discovery_failed'] ?? 0) + ($lastCycle['pipeline_failed'] ?? 0)) > 0 ? 'Needs attention' : 'Healthy' }}
+                <span id="workspace-cycle-health" class="worker-health {{ (($lastCycle['discovery_failed'] ?? 0) + ($lastCycle['pipeline_failed'] ?? 0) + ($lastCycle['delivery_failed'] ?? 0)) > 0 ? 'attention' : 'good' }}">
+                    {{ (($lastCycle['discovery_failed'] ?? 0) + ($lastCycle['pipeline_failed'] ?? 0) + ($lastCycle['delivery_failed'] ?? 0)) > 0 ? 'Needs attention' : 'Healthy' }}
                 </span>
             </header>
 
@@ -101,6 +101,9 @@
                 <div><span>Discovery completed</span><strong id="cycle-completed">{{ $lastCycle['discovery_completed'] ?? 0 }}</strong></div>
                 <div><span>Discovery failed</span><strong id="cycle-discovery-failed">{{ $lastCycle['discovery_failed'] ?? 0 }}</strong></div>
                 <div><span>Pipeline failed</span><strong id="cycle-pipeline-failed">{{ $lastCycle['pipeline_failed'] ?? 0 }}</strong></div>
+                <div><span>Auto sent</span><strong id="cycle-delivery-sent">{{ $lastCycle['delivery_sent'] ?? 0 }}</strong></div>
+                <div><span>Auto paused</span><strong id="cycle-delivery-paused">{{ $lastCycle['delivery_paused'] ?? 0 }}</strong></div>
+                <div><span>Delivery API errors</span><strong id="cycle-delivery-failed">{{ $lastCycle['delivery_failed'] ?? 0 }}</strong></div>
             </div>
 
             <div class="worker-today">
@@ -126,7 +129,7 @@
             </div>
 
             <p class="worker-note">
-                Worker automation handles discovery, website analysis, contact discovery, and draft generation. Approved email sending remains a human action.
+                Worker automation handles discovery, website analysis, contact discovery, draft generation, and controlled delivery checks. Automatic delivery can only send drafts you already approved and only while a delivery session is active.
             </p>
         </article>
 
@@ -246,6 +249,9 @@ document.addEventListener('DOMContentLoaded', () => {
         setText('cycle-completed', cycle.discovery_completed ?? 0);
         setText('cycle-discovery-failed', cycle.discovery_failed ?? 0);
         setText('cycle-pipeline-failed', cycle.pipeline_failed ?? 0);
+        setText('cycle-delivery-sent', cycle.delivery_sent ?? 0);
+        setText('cycle-delivery-paused', cycle.delivery_paused ?? 0);
+        setText('cycle-delivery-failed', cycle.delivery_failed ?? 0);
         setText('worker-leads-today', activity.new_leads_today ?? 0);
         setText('worker-analyzed-today', activity.analyzed_today ?? 0);
         setText('worker-drafts-today', activity.drafts_today ?? 0);
@@ -279,7 +285,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (start) start.disabled = ['starting', 'running', 'stopping'].includes(state) || worker.supported === false;
         if (stop) stop.disabled = !['starting', 'running'].includes(state) || worker.supported === false;
 
-        const failures = Number(cycle.discovery_failed || 0) + Number(cycle.pipeline_failed || 0);
+        const failures = Number(cycle.discovery_failed || 0)
+            + Number(cycle.pipeline_failed || 0)
+            + Number(cycle.delivery_failed || 0);
         const health = document.getElementById('workspace-cycle-health');
         if (health) {
             health.textContent = failures > 0 ? 'Needs attention' : 'Healthy';
