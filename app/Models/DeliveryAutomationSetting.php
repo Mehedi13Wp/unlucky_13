@@ -16,6 +16,7 @@ class DeliveryAutomationSetting extends Model
         'session_started_at',
         'session_ends_at',
         'last_attempt_at',
+        'next_attempt_at',
         'last_sent_at',
         'last_status',
         'last_message',
@@ -31,6 +32,7 @@ class DeliveryAutomationSetting extends Model
             'session_started_at' => 'datetime',
             'session_ends_at' => 'datetime',
             'last_attempt_at' => 'datetime',
+            'next_attempt_at' => 'datetime',
             'last_sent_at' => 'datetime',
         ];
     }

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\CampaignStatus;
 use App\Enums\LeadStatus;
 use App\Models\Campaign;
+use App\Models\DeliveryAutomationSetting;
 use App\Models\Lead;
 use App\Models\OutreachDraft;
 use App\Models\User;
@@ -56,6 +57,35 @@ class DashboardLiveStatusTest extends TestCase
             'generated_at' => now(),
         ]);
 
+        $approvedLead = Lead::factory()->for($campaign)->create([
+            'status' => LeadStatus::Approved,
+            'qualified_at' => now()->subMinutes(3),
+            'created_at' => now()->subMinutes(3),
+        ]);
+
+        OutreachDraft::query()->create([
+            'lead_id' => $approvedLead->id,
+            'channel' => 'email',
+            'recipient' => 'approved@example.com',
+            'subject' => 'Approved idea',
+            'body' => 'Human-approved outreach.',
+            'status' => OutreachDraft::STATUS_APPROVED,
+            'generated_at' => now(),
+            'reviewed_at' => now(),
+        ]);
+
+        DeliveryAutomationSetting::query()->create([
+            'user_id' => $user->id,
+            'enabled' => true,
+            'global_daily_limit' => 20,
+            'interval_minutes' => 15,
+            'session_hours' => 5,
+            'session_started_at' => now(),
+            'session_ends_at' => now()->addHours(5),
+            'last_status' => 'active',
+            'last_message' => 'Automatic delivery session started.',
+        ]);
+
         $manager = Mockery::mock(LocalWorkerManager::class);
         $manager->shouldReceive('status')->once()->andReturn([
             'supported' => true,
@@ -84,14 +114,19 @@ class DashboardLiveStatusTest extends TestCase
             ->assertJsonPath('activity.campaigns', 1)
             ->assertJsonPath('activity.active_campaigns', 1)
             ->assertJsonPath('activity.draft_campaigns', 0)
-            ->assertJsonPath('activity.businesses_found', 1)
-            ->assertJsonPath('activity.qualified', 1)
+            ->assertJsonPath('activity.businesses_found', 2)
+            ->assertJsonPath('activity.qualified', 2)
             ->assertJsonPath('activity.qualification_rate', 100)
             ->assertJsonPath('activity.review_queue', 1)
             ->assertJsonPath('activity.interested', 0)
-            ->assertJsonPath('activity.new_leads_today', 1)
+            ->assertJsonPath('activity.new_leads_today', 2)
             ->assertJsonPath('activity.analyzed_today', 1)
-            ->assertJsonPath('activity.drafts_today', 1)
+            ->assertJsonPath('activity.drafts_today', 2)
+            ->assertJsonPath('activity.delivery_state', 'queued')
+            ->assertJsonPath('activity.delivery_queue', 1)
+            ->assertJsonPath('activity.delivery_sending', 0)
+            ->assertJsonPath('activity.delivery_sent_today', 0)
+            ->assertJsonPath('activity.delivery_global_daily_limit', 20)
             ->assertJsonPath('activity.discovery_fresh', 4)
             ->assertJsonPath('activity.discovery_duplicates_skipped', 13)
             ->assertJsonPath('activity.discovery_failed', 0)

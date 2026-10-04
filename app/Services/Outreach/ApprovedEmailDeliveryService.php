@@ -109,76 +109,51 @@ class ApprovedEmailDeliveryService
             );
         }
 
-        $dailyLimit = max(0, (int) $campaign->daily_outreach_limit);
-        $sentToday = OutreachMessage::query()
-            ->where('campaign_id', $campaign->id)
-            ->where('status', OutreachMessage::STATUS_SENT)
-            ->whereBetween('sent_at', [now()->startOfDay(), now()->endOfDay()])
-            ->count();
-
-        if ($sentToday >= $dailyLimit) {
+        if (
+            $outreachDraft->message?->status === OutreachMessage::STATUS_FAILED
+            && $outreachDraft->message->retry_at !== null
+            && now()->lessThan($outreachDraft->message->retry_at)
+        ) {
             return [
                 ...$this->result(
-                    'daily_limit_reached',
-                    'Campaign daily outreach limit has been reached.',
-                    409,
+                    'retry_wait',
+                    'Delivery retry is waiting for its controlled retry window.',
+                    200,
                     $outreachDraft,
+                    $outreachDraft->message,
                 ),
-                'daily_limit' => $dailyLimit,
-                'sent_today' => $sentToday,
+                'attempt_count' => (int) $outreachDraft->message->attempt_count,
+                'retry_at' => $outreachDraft->message->retry_at->toISOString(),
             ];
-        }
-
-        $senderPoolExists = SenderAccount::query()
-            ->where('user_id', $campaign->user_id)
-            ->exists();
-
-        $senderAccount = $senderPoolExists
-            ? $this->nextSenderAccount($campaign->user_id)
-            : null;
-
-        if ($senderPoolExists && $senderAccount === null) {
-            return $this->result(
-                'no_sender_available',
-                'You have no available sender emails today. Add/update sender accounts or wait for a daily limit to reset.',
-                409,
-                $outreachDraft,
-            );
-        }
-
-        $mailer = $senderAccount ? 'sender_pool' : (string) config('mail.default', 'log');
-
-        if ($senderAccount === null && ! in_array($mailer, self::DELIVERY_MAILERS, true)) {
-            return [
-                ...$this->result(
-                    'mailer_not_delivery_capable',
-                    'A delivery-capable mailer must be configured before sending.',
-                    409,
-                    $outreachDraft,
-                ),
-                'mailer' => $mailer,
-            ];
-        }
-
-        if ($senderAccount !== null) {
-            $this->configureSenderMailer($senderAccount);
         }
 
         $message = null;
+        $senderAccount = null;
+        $mailer = null;
         $transactionResult = null;
 
         DB::transaction(function () use (
             $outreachDraft,
-            $lead,
-            $campaign,
-            $senderAccount,
             &$message,
+            &$senderAccount,
+            &$mailer,
             &$transactionResult,
         ): void {
             $lockedDraft = OutreachDraft::query()
                 ->whereKey($outreachDraft->id)
                 ->lockForUpdate()
                 ->firstOrFail();
+
+            $lockedLead = $lockedDraft->lead()
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $lockedCampaign = $lockedLead->campaign()
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $lockedDraft->setRelation('lead', $lockedLead);
+            $lockedLead->setRelation('campaign', $lockedCampaign);
 
             $existingMessage = OutreachMessage::query()
                 ->where('outreach_draft_id', $lockedDraft->id)
@@ -203,10 +178,168 @@ class ApprovedEmailDeliveryService
                     'Draft state changed before delivery could start.',
                     409,
                     $lockedDraft,
+                    $existingMessage,
                 );
 
                 return;
             }
+
+            if ($lockedDraft->channel !== 'email') {
+                $transactionResult = $this->result(
+                    'unsupported_channel',
+                    'Only approved email drafts can use automated delivery.',
+                    409,
+                    $lockedDraft,
+                    $existingMessage,
+                );
+
+                return;
+            }
+
+            if ($lockedCampaign->status !== CampaignStatus::Active) {
+                $transactionResult = $this->result(
+                    'campaign_not_active',
+                    'The draft campaign is not active.',
+                    409,
+                    $lockedDraft,
+                    $existingMessage,
+                );
+
+                return;
+            }
+
+            if ($lockedLead->status !== LeadStatus::Approved) {
+                $transactionResult = $this->result(
+                    'lead_not_approved',
+                    'The lead must be approved before delivery.',
+                    409,
+                    $lockedDraft,
+                    $existingMessage,
+                );
+
+                return;
+            }
+
+            if (Suppression::isEmailSuppressed($lockedDraft->recipient)) {
+                $transactionResult = $this->result(
+                    'recipient_suppressed',
+                    'Recipient is on the suppression list.',
+                    409,
+                    $lockedDraft,
+                    $existingMessage,
+                );
+
+                return;
+            }
+
+            if (
+                $existingMessage?->status === OutreachMessage::STATUS_FAILED
+                && $existingMessage->retry_at !== null
+                && now()->lessThan($existingMessage->retry_at)
+            ) {
+                $transactionResult = [
+                    ...$this->result(
+                        'retry_wait',
+                        'Delivery retry is waiting for its controlled retry window.',
+                        200,
+                        $lockedDraft,
+                        $existingMessage,
+                    ),
+                    'attempt_count' => (int) $existingMessage->attempt_count,
+                    'retry_at' => $existingMessage->retry_at->toISOString(),
+                ];
+
+                return;
+            }
+
+            $today = [now()->startOfDay(), now()->endOfDay()];
+            $dailyLimit = max(0, (int) $lockedCampaign->daily_outreach_limit);
+            $reservedToday = $this->reservedMessageCount(
+                'campaign_id',
+                $lockedCampaign->id,
+                $today,
+            );
+
+            if ($reservedToday >= $dailyLimit) {
+                $transactionResult = [
+                    ...$this->result(
+                        'daily_limit_reached',
+                        'Campaign daily outreach limit has been reached.',
+                        409,
+                        $lockedDraft,
+                        $existingMessage,
+                    ),
+                    'daily_limit' => $dailyLimit,
+                    'sent_today' => OutreachMessage::query()
+                        ->where('campaign_id', $lockedCampaign->id)
+                        ->where('status', OutreachMessage::STATUS_SENT)
+                        ->whereBetween('sent_at', $today)
+                        ->count(),
+                ];
+
+                return;
+            }
+
+            $senderPoolExists = SenderAccount::query()
+                ->where('user_id', $lockedCampaign->user_id)
+                ->exists();
+
+            if ($senderPoolExists) {
+                $accounts = SenderAccount::query()
+                    ->where('user_id', $lockedCampaign->user_id)
+                    ->where('enabled', true)
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get();
+
+                foreach ($accounts as $account) {
+                    if (! $account->isConfigured()) {
+                        continue;
+                    }
+
+                    $reservedBySender = $this->reservedMessageCount(
+                        'sender_account_id',
+                        $account->id,
+                        $today,
+                    );
+
+                    if ($reservedBySender < max(1, (int) $account->daily_limit)) {
+                        $senderAccount = $account;
+                        break;
+                    }
+                }
+
+                if ($senderAccount === null) {
+                    $transactionResult = $this->result(
+                        'no_sender_available',
+                        'You have no available sender emails today. Add/update sender accounts or wait for a daily limit to reset.',
+                        409,
+                        $lockedDraft,
+                        $existingMessage,
+                    );
+
+                    return;
+                }
+            }
+
+            $mailer = $senderAccount ? 'sender_pool' : (string) config('mail.default', 'log');
+
+            if ($senderAccount === null && ! in_array($mailer, self::DELIVERY_MAILERS, true)) {
+                $transactionResult = [
+                    ...$this->result(
+                        'mailer_not_delivery_capable',
+                        'A delivery-capable mailer must be configured before sending.',
+                        409,
+                        $lockedDraft,
+                        $existingMessage,
+                    ),
+                    'mailer' => $mailer,
+                ];
+
+                return;
+            }
+
+            $attemptCount = max(0, (int) ($existingMessage?->attempt_count ?? 0)) + 1;
 
             $lockedDraft->update([
                 'status' => OutreachDraft::STATUS_SENDING,
@@ -215,8 +348,8 @@ class ApprovedEmailDeliveryService
             $message = OutreachMessage::query()->updateOrCreate(
                 ['outreach_draft_id' => $lockedDraft->id],
                 [
-                    'lead_id' => $lead->id,
-                    'campaign_id' => $campaign->id,
+                    'lead_id' => $lockedLead->id,
+                    'campaign_id' => $lockedCampaign->id,
                     'sender_account_id' => $senderAccount?->id,
                     'sender_address' => $senderAccount?->email
                         ?: (string) config('mail.from.address'),
@@ -226,7 +359,9 @@ class ApprovedEmailDeliveryService
                     'body' => $lockedDraft->body,
                     'status' => OutreachMessage::STATUS_SENDING,
                     'error_message' => null,
+                    'attempt_count' => $attemptCount,
                     'attempted_at' => now(),
+                    'retry_at' => null,
                     'sent_at' => null,
                 ],
             );
@@ -236,59 +371,81 @@ class ApprovedEmailDeliveryService
             return $transactionResult;
         }
 
+        if ($senderAccount !== null) {
+            $this->configureSenderMailer($senderAccount);
+        }
+
         try {
             if ($senderAccount !== null) {
                 Mail::mailer('sender_pool')->raw(
                     $outreachDraft->body,
-                    function ($message) use ($outreachDraft, $senderAccount): void {
-                        $message->from(
+                    function ($mailMessage) use ($outreachDraft, $senderAccount): void {
+                        $mailMessage->from(
                             $senderAccount->email,
                             $senderAccount->from_name ?: null,
                         );
 
-                        $message->to($outreachDraft->recipient)
+                        $mailMessage->to($outreachDraft->recipient)
                             ->subject((string) $outreachDraft->subject);
                     },
                 );
             } else {
                 Mail::raw(
                     $outreachDraft->body,
-                    function ($message) use ($outreachDraft): void {
-                        $message->to($outreachDraft->recipient)
+                    function ($mailMessage) use ($outreachDraft): void {
+                        $mailMessage->to($outreachDraft->recipient)
                             ->subject((string) $outreachDraft->subject);
                     },
                 );
             }
         } catch (Throwable $error) {
-            $message?->update([
-                'status' => OutreachMessage::STATUS_FAILED,
-                'error_message' => mb_substr($error->getMessage(), 0, 2000),
-            ]);
+            $attemptCount = max(1, (int) ($message?->attempt_count ?? 1));
+            $retryMinutes = $this->retryDelayMinutes($attemptCount);
+            $retryAt = now()->addMinutes($retryMinutes);
 
-            OutreachDraft::query()
-                ->whereKey($outreachDraft->id)
-                ->update([
-                    'status' => OutreachDraft::STATUS_APPROVED,
+            DB::transaction(function () use (
+                $message,
+                $outreachDraft,
+                $error,
+                $retryAt,
+            ): void {
+                $message?->update([
+                    'status' => OutreachMessage::STATUS_FAILED,
+                    'error_message' => mb_substr($error->getMessage(), 0, 2000),
+                    'retry_at' => $retryAt,
                 ]);
+
+                OutreachDraft::query()
+                    ->whereKey($outreachDraft->id)
+                    ->update([
+                        'status' => OutreachDraft::STATUS_APPROVED,
+                    ]);
+            });
 
             $outreachDraft->setAttribute(
                 'status',
                 OutreachDraft::STATUS_APPROVED,
             );
 
-            return $this->result(
-                'failed',
-                'Delivery failed. The draft remains approved for a controlled retry.',
-                200,
-                $outreachDraft,
-                $message,
-            );
+            return [
+                ...$this->result(
+                    'failed',
+                    'Delivery failed. The draft remains approved and has been scheduled for a controlled retry.',
+                    200,
+                    $outreachDraft,
+                    $message,
+                ),
+                'attempt_count' => $attemptCount,
+                'retry_at' => $retryAt->toISOString(),
+                'retry_in_minutes' => $retryMinutes,
+            ];
         }
 
         DB::transaction(function () use ($message, $outreachDraft, $lead, $senderAccount): void {
             $message?->update([
                 'status' => OutreachMessage::STATUS_SENT,
                 'error_message' => null,
+                'retry_at' => null,
                 'sent_at' => now(),
             ]);
 
@@ -306,43 +463,49 @@ class ApprovedEmailDeliveryService
             ]);
         });
 
-        return $this->result(
-            'sent',
-            'Approved email sent successfully.',
-            200,
-            $outreachDraft,
-            $message,
-            LeadStatus::Contacted->value,
-        );
+        return [
+            ...$this->result(
+                'sent',
+                'Approved email sent successfully.',
+                200,
+                $outreachDraft,
+                $message,
+                LeadStatus::Contacted->value,
+            ),
+            'attempt_count' => (int) ($message?->attempt_count ?? 1),
+        ];
     }
 
-    private function nextSenderAccount(int $userId): ?SenderAccount
+    private function reservedMessageCount(
+        string $column,
+        int $id,
+        array $today,
+    ): int {
+        return OutreachMessage::query()
+            ->where($column, $id)
+            ->where(function ($query) use ($today): void {
+                $query
+                    ->where(function ($sent) use ($today): void {
+                        $sent
+                            ->where('status', OutreachMessage::STATUS_SENT)
+                            ->whereBetween('sent_at', $today);
+                    })
+                    ->orWhere(function ($sending) use ($today): void {
+                        $sending
+                            ->where('status', OutreachMessage::STATUS_SENDING)
+                            ->whereBetween('attempted_at', $today);
+                    });
+            })
+            ->count();
+    }
+
+    private function retryDelayMinutes(int $attemptCount): int
     {
-        $today = [now()->startOfDay(), now()->endOfDay()];
-
-        $accounts = SenderAccount::query()
-            ->where('user_id', $userId)
-            ->where('enabled', true)
-            ->orderBy('id')
-            ->get();
-
-        foreach ($accounts as $account) {
-            if (! $account->isConfigured()) {
-                continue;
-            }
-
-            $sentToday = OutreachMessage::query()
-                ->where('sender_account_id', $account->id)
-                ->where('status', OutreachMessage::STATUS_SENT)
-                ->whereBetween('sent_at', $today)
-                ->count();
-
-            if ($sentToday < max(1, (int) $account->daily_limit)) {
-                return $account;
-            }
-        }
-
-        return null;
+        return match (true) {
+            $attemptCount <= 1 => 5,
+            $attemptCount === 2 => 15,
+            default => 30,
+        };
     }
 
     private function configureSenderMailer(SenderAccount $account): void

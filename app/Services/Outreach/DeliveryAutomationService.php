@@ -7,10 +7,13 @@ use App\Models\DeliveryAutomationSetting;
 use App\Models\OutreachDraft;
 use App\Models\OutreachMessage;
 use App\Models\SenderAccount;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class DeliveryAutomationService
 {
+    private const MAX_AUTOMATIC_ATTEMPTS = 3;
+
     public function __construct(
         private readonly ApprovedEmailDeliveryService $deliveryService,
     ) {
@@ -61,9 +64,9 @@ class DeliveryAutomationService
             }
 
             if (
-                $setting->last_status === 'checking_queue'
+                in_array($setting->last_status, ['checking_queue', 'sending'], true)
                 && $setting->last_attempt_at !== null
-                && now()->lessThan($setting->last_attempt_at->copy()->addMinutes(2))
+                && now()->lessThan($setting->last_attempt_at->copy()->addMinutes(5))
             ) {
                 return [
                     'status' => 'busy',
@@ -75,6 +78,7 @@ class DeliveryAutomationService
             if ($setting->session_ends_at === null || now()->greaterThanOrEqualTo($setting->session_ends_at)) {
                 $setting->update([
                     'enabled' => false,
+                    'next_attempt_at' => null,
                     'last_status' => 'session_expired',
                     'last_message' => 'Automatic delivery session finished. Start a new session to continue.',
                 ]);
@@ -97,6 +101,7 @@ class DeliveryAutomationService
             if ($sentToday >= max(1, (int) $setting->global_daily_limit)) {
                 $setting->update([
                     'enabled' => false,
+                    'next_attempt_at' => null,
                     'last_status' => 'global_daily_limit_reached',
                     'last_message' => 'Global daily delivery limit reached. Start a new session on a later day to continue.',
                 ]);
@@ -109,20 +114,15 @@ class DeliveryAutomationService
             }
 
             if (
-                $setting->last_sent_at !== null
-                && now()->lessThan(
-                    $setting->last_sent_at->copy()->addMinutes(
-                        max(5, (int) $setting->interval_minutes),
-                    ),
-                )
+                $setting->next_attempt_at !== null
+                && now()->lessThan($setting->next_attempt_at)
             ) {
                 return [
-                    'status' => 'waiting_interval',
+                    'status' => $setting->last_status === 'retry_wait'
+                        ? 'retry_wait'
+                        : 'waiting_interval',
                     'user_id' => $setting->user_id,
-                    'next_at' => $setting->last_sent_at
-                        ->copy()
-                        ->addMinutes(max(5, (int) $setting->interval_minutes))
-                        ->toISOString(),
+                    'next_at' => $setting->next_attempt_at->toISOString(),
                 ];
             }
 
@@ -136,6 +136,7 @@ class DeliveryAutomationService
                 'status' => 'ready',
                 'user_id' => $setting->user_id,
                 'setting_id' => $setting->id,
+                'interval_minutes' => max(5, (int) $setting->interval_minutes),
             ];
         });
 
@@ -145,6 +146,7 @@ class DeliveryAutomationService
 
         $userId = (int) $gate['user_id'];
         $settingId = (int) $gate['setting_id'];
+        $intervalMinutes = (int) $gate['interval_minutes'];
 
         if (! SenderAccount::query()->where('user_id', $userId)->exists()) {
             return $this->pause(
@@ -169,7 +171,8 @@ class DeliveryAutomationService
             )
             ->with(['lead.campaign', 'message'])
             ->oldest('reviewed_at')
-            ->limit(25)
+            ->oldest('id')
+            ->limit(100)
             ->get();
 
         if ($drafts->isEmpty()) {
@@ -177,6 +180,7 @@ class DeliveryAutomationService
                 $settingId,
                 'waiting_for_approved_queue',
                 'No approved email drafts are waiting. Discovery and drafting can continue normally.',
+                ['next_attempt_at' => null],
             );
 
             return [
@@ -185,17 +189,28 @@ class DeliveryAutomationService
             ];
         }
 
+        $earliestRetryAt = null;
+
         foreach ($drafts as $draft) {
+            $this->mark(
+                $settingId,
+                'sending',
+                'Sending one human-approved email from the controlled queue.',
+            );
+
             $result = $this->deliveryService->send($draft);
             $status = (string) ($result['status'] ?? 'unknown');
 
-            if (in_array($status, ['sent', 'already_sent'], true)) {
+            if ($status === 'sent') {
+                $nextAttemptAt = now()->addMinutes($intervalMinutes);
+
                 DeliveryAutomationSetting::query()
                     ->whereKey($settingId)
                     ->update([
                         'last_sent_at' => now(),
+                        'next_attempt_at' => $nextAttemptAt,
                         'last_status' => 'sent',
-                        'last_message' => 'One human-approved email was delivered automatically.',
+                        'last_message' => 'One human-approved email was delivered automatically. The queue is waiting for the next interval.',
                     ]);
 
                 return [
@@ -203,7 +218,25 @@ class DeliveryAutomationService
                     'user_id' => $userId,
                     'draft_id' => $draft->id,
                     'recipient' => $draft->recipient,
+                    'next_at' => $nextAttemptAt->toISOString(),
                 ];
+            }
+
+            if ($status === 'already_sent') {
+                continue;
+            }
+
+            if ($status === 'retry_wait') {
+                $retryAt = $this->parseRetryAt($result['retry_at'] ?? null);
+
+                if (
+                    $retryAt !== null
+                    && ($earliestRetryAt === null || $retryAt->lessThan($earliestRetryAt))
+                ) {
+                    $earliestRetryAt = $retryAt;
+                }
+
+                continue;
             }
 
             if (in_array($status, [
@@ -211,7 +244,10 @@ class DeliveryAutomationService
                 'campaign_not_active',
                 'lead_not_approved',
                 'daily_limit_reached',
-                'already_sent',
+                'draft_state_changed',
+                'draft_not_approved',
+                'unsupported_channel',
+                'delivery_in_progress',
             ], true)) {
                 continue;
             }
@@ -225,11 +261,37 @@ class DeliveryAutomationService
             }
 
             if ($status === 'failed') {
-                return $this->pause(
+                $attemptCount = max(1, (int) ($result['attempt_count'] ?? 1));
+
+                if ($attemptCount >= self::MAX_AUTOMATIC_ATTEMPTS) {
+                    return $this->pause(
+                        $settingId,
+                        'delivery_failed',
+                        'Automatic delivery paused after repeated delivery failures. Review the sender account before restarting.',
+                    );
+                }
+
+                $retryAt = $this->parseRetryAt($result['retry_at'] ?? null)
+                    ?? now()->addMinutes($intervalMinutes);
+                $intervalAt = now()->addMinutes($intervalMinutes);
+                $nextAttemptAt = $retryAt->greaterThan($intervalAt)
+                    ? $retryAt
+                    : $intervalAt;
+
+                $this->mark(
                     $settingId,
-                    'delivery_failed',
-                    'Automatic delivery paused after an SMTP/delivery failure. Review the sender account before restarting.',
+                    'retry_wait',
+                    "Delivery failed safely. Retry {$attemptCount} is scheduled after the controlled wait.",
+                    ['next_attempt_at' => $nextAttemptAt],
                 );
+
+                return [
+                    'status' => 'retry_wait',
+                    'user_id' => $userId,
+                    'draft_id' => $draft->id,
+                    'attempt_count' => $attemptCount,
+                    'next_at' => $nextAttemptAt->toISOString(),
+                ];
             }
 
             return $this->pause(
@@ -239,10 +301,30 @@ class DeliveryAutomationService
             );
         }
 
+        if ($earliestRetryAt !== null) {
+            $nextAttemptAt = $earliestRetryAt->greaterThan(now())
+                ? $earliestRetryAt
+                : now()->addMinute();
+
+            $this->mark(
+                $settingId,
+                'retry_wait',
+                'A failed draft is waiting for its controlled retry window.',
+                ['next_attempt_at' => $nextAttemptAt],
+            );
+
+            return [
+                'status' => 'retry_wait',
+                'user_id' => $userId,
+                'next_at' => $nextAttemptAt->toISOString(),
+            ];
+        }
+
         $this->mark(
             $settingId,
             'waiting_for_eligible_draft',
             'Approved drafts exist, but none are currently eligible under campaign or suppression controls.',
+            ['next_attempt_at' => null],
         );
 
         return [
@@ -258,6 +340,7 @@ class DeliveryAutomationService
         if ($setting !== null) {
             $setting->update([
                 'enabled' => false,
+                'next_attempt_at' => null,
                 'last_status' => $status,
                 'last_message' => $message,
             ]);
@@ -270,13 +353,31 @@ class DeliveryAutomationService
         ];
     }
 
-    private function mark(int $settingId, string $status, string $message): void
-    {
+    private function mark(
+        int $settingId,
+        string $status,
+        string $message,
+        array $extra = [],
+    ): void {
         DeliveryAutomationSetting::query()
             ->whereKey($settingId)
             ->update([
                 'last_status' => $status,
                 'last_message' => $message,
+                ...$extra,
             ]);
+    }
+
+    private function parseRetryAt(mixed $value): ?Carbon
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

@@ -127,6 +127,79 @@ class DeliveryAutomationTest extends TestCase
         $this->assertSame('no_sender_available', $setting->fresh()->last_status);
     }
 
+    public function test_worker_skips_campaign_at_daily_limit_and_sends_next_eligible_campaign(): void
+    {
+        Mail::fake();
+
+        $user = User::factory()->create();
+        $this->sender($user);
+
+        DeliveryAutomationSetting::query()->create([
+            'user_id' => $user->id,
+            'enabled' => true,
+            'global_daily_limit' => 20,
+            'interval_minutes' => 15,
+            'session_hours' => 5,
+            'session_started_at' => now(),
+            'session_ends_at' => now()->addHours(5),
+        ]);
+
+        $limitedCampaign = Campaign::factory()->for($user)->create([
+            'status' => CampaignStatus::Active,
+            'daily_outreach_limit' => 1,
+        ]);
+
+        $sentLead = Lead::factory()->for($limitedCampaign)->create([
+            'status' => LeadStatus::Contacted,
+        ]);
+        $sentDraft = $sentLead->outreachDrafts()->create([
+            'channel' => 'email',
+            'recipient' => 'already@business.test',
+            'subject' => 'Already sent',
+            'body' => 'Already sent body',
+            'status' => OutreachDraft::STATUS_SENT,
+            'reviewed_at' => now()->subMinutes(10),
+        ]);
+
+        OutreachMessage::query()->create([
+            'outreach_draft_id' => $sentDraft->id,
+            'lead_id' => $sentLead->id,
+            'campaign_id' => $limitedCampaign->id,
+            'channel' => 'email',
+            'recipient' => 'already@business.test',
+            'subject' => 'Already sent',
+            'body' => 'Already sent body',
+            'status' => OutreachMessage::STATUS_SENT,
+            'attempt_count' => 1,
+            'attempted_at' => now()->subMinutes(5),
+            'sent_at' => now()->subMinutes(5),
+        ]);
+
+        $blockedDraft = $this->approvedDraft(
+            $limitedCampaign,
+            'blocked-by-campaign-limit@business.test',
+        );
+        $blockedDraft->update(['reviewed_at' => now()->subMinutes(4)]);
+
+        $eligibleCampaign = Campaign::factory()->for($user)->create([
+            'status' => CampaignStatus::Active,
+            'daily_outreach_limit' => 20,
+        ]);
+        $eligibleDraft = $this->approvedDraft(
+            $eligibleCampaign,
+            'eligible@business.test',
+        );
+
+        $this->withToken($this->token)
+            ->postJson('/api/worker/delivery/automation/run')
+            ->assertOk()
+            ->assertJsonPath('status', 'sent')
+            ->assertJsonPath('sent', 1);
+
+        $this->assertSame(OutreachDraft::STATUS_APPROVED, $blockedDraft->fresh()->status);
+        $this->assertSame(OutreachDraft::STATUS_SENT, $eligibleDraft->fresh()->status);
+    }
+
     private function sender(User $user): SenderAccount
     {
         return SenderAccount::query()->create([

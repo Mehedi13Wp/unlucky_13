@@ -98,6 +98,13 @@ class WorkerDeliveryApiTest extends TestCase
             'outreach_draft_id' => $draft->id,
             'status' => OutreachMessage::STATUS_SENT,
         ]);
+
+        $this->withToken($this->token)
+            ->postJson('/api/worker/outreach-drafts/'.$draft->id.'/send')
+            ->assertOk()
+            ->assertJsonPath('status', 'already_sent');
+
+        $this->assertDatabaseCount('outreach_messages', 1);
     }
 
     public function test_failed_delivery_returns_draft_to_approved_for_controlled_retry(): void
@@ -136,7 +143,22 @@ class WorkerDeliveryApiTest extends TestCase
         $this->assertDatabaseHas('outreach_messages', [
             'outreach_draft_id' => $draft->id,
             'status' => OutreachMessage::STATUS_FAILED,
+            'attempt_count' => 1,
         ]);
+
+        $message = OutreachMessage::query()
+            ->where('outreach_draft_id', $draft->id)
+            ->firstOrFail();
+
+        $this->assertNotNull($message->retry_at);
+
+        $this->withToken($this->token)
+            ->postJson('/api/worker/outreach-drafts/'.$draft->id.'/send')
+            ->assertOk()
+            ->assertJsonPath('status', 'retry_wait')
+            ->assertJsonPath('attempt_count', 1);
+
+        $this->assertDatabaseCount('outreach_messages', 1);
     }
 
     public function test_suppressed_recipient_cannot_be_sent(): void

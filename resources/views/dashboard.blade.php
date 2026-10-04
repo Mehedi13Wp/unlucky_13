@@ -109,7 +109,7 @@
             </div>
             <div class="control-row">
                 <span>Auto-send</span>
-                <strong>Locked</strong>
+                <strong id="worker-auto-send-state">{{ strtoupper($workerActivity['delivery_state']) }}</strong>
             </div>
         </div>
     </section>
@@ -149,6 +149,25 @@
             <span>Drafts today</span>
             <strong id="worker-drafts-today">{{ number_format($workerActivity['drafts_today']) }}</strong>
             <small>Waiting for human review</small>
+        </div>
+        <div class="worker-live-item worker-live-item-delivery">
+            <span>Auto-send queue</span>
+            <strong id="delivery-queue">{{ number_format($workerActivity['delivery_queue']) }}</strong>
+            <small>Human-approved email drafts waiting to send</small>
+        </div>
+        <div class="worker-live-item worker-live-item-delivery">
+            <span>Delivery state</span>
+            <strong id="delivery-state" class="delivery-state-value {{ $workerActivity['delivery_state'] }}">
+                {{ strtoupper($workerActivity['delivery_state']) }}
+            </strong>
+            <small id="delivery-detail">{{ $workerActivity['delivery_detail'] }}</small>
+        </div>
+        <div class="worker-live-item worker-live-item-delivery">
+            <span>Sent today</span>
+            <strong id="delivery-sent-today">
+                {{ number_format($workerActivity['delivery_sent_today']) }} / {{ number_format($workerActivity['delivery_global_daily_limit']) }}
+            </strong>
+            <small id="delivery-next-at">{{ $workerActivity['delivery_next_label'] }}</small>
         </div>
     </section>
 
@@ -400,6 +419,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const titleNode = document.getElementById('worker-runtime-title');
     const startButton = document.getElementById('worker-start-button');
     const stopButton = document.getElementById('worker-stop-button');
+    const deliveryStateNode = document.getElementById('delivery-state');
 
     const stateTitles = {
         starting: 'Starting background worker',
@@ -454,6 +474,21 @@ document.addEventListener('DOMContentLoaded', () => {
         setText('worker-analyzed-today', activity.analyzed_today ?? 0);
         setText('worker-drafts-today', activity.drafts_today ?? 0);
         setText('worker-active-campaigns', activity.active_campaigns ?? 0);
+        setText('worker-auto-send-state', (activity.delivery_state || 'stopped').toUpperCase());
+        setText('delivery-queue', activity.delivery_queue ?? 0);
+        setText('delivery-detail', activity.delivery_detail || 'Automatic delivery status unavailable.');
+        setText(
+            'delivery-sent-today',
+            (activity.delivery_sent_today ?? 0) + ' / ' + (activity.delivery_global_daily_limit ?? 0)
+        );
+        setText('delivery-next-at', activity.delivery_next_label || 'No send is currently scheduled');
+
+        if (deliveryStateNode) {
+            const deliveryState = activity.delivery_state || 'stopped';
+            deliveryStateNode.textContent = deliveryState.toUpperCase();
+            deliveryStateNode.classList.remove('queued', 'sending', 'paused', 'idle', 'stopped');
+            deliveryStateNode.classList.add(deliveryState);
+        }
         setText('metric-campaigns', activity.campaigns ?? 0);
         setText('metric-active-campaigns', activity.active_campaigns ?? 0);
         setText('metric-draft-campaigns', activity.draft_campaigns ?? 0);

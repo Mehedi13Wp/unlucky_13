@@ -965,3 +965,32 @@ a.activity-row:hover {
     color: #b8c7bd;
     font-weight: 650;
 }
+
+
+/* Auto-send queue status */
+.worker-live-item-delivery {
+    border-color: rgba(103, 162, 125, .24);
+    background: linear-gradient(180deg, rgba(18, 38, 27, .98), rgba(11, 27, 18, .98));
+}
+
+.delivery-state-value {
+    font-weight: 900;
+    letter-spacing: .04em;
+}
+
+.delivery-state-value.queued {
+    color: #d9c77c;
+}
+
+.delivery-state-value.sending {
+    color: #7ee0b8;
+}
+
+.delivery-state-value.paused {
+    color: #f48790;
+}
+
+.delivery-state-value.idle,
+.delivery-state-value.stopped {
+    color: #aeb9c7;
+}

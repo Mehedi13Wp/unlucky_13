@@ -259,6 +259,7 @@ class SenderAccountController extends Controller
                 'session_started_at' => now(),
                 'session_ends_at' => now()->addHours((int) $validated['session_hours']),
                 'last_attempt_at' => null,
+                'next_attempt_at' => null,
                 'last_status' => 'active',
                 'last_message' => 'Automatic delivery session started. Only human-approved email drafts can be sent.',
             ],
@@ -277,6 +278,7 @@ class SenderAccountController extends Controller
         if ($setting !== null) {
             $setting->update([
                 'enabled' => false,
+                'next_attempt_at' => null,
                 'last_status' => 'stopped',
                 'last_message' => 'Automatic delivery was stopped manually.',
             ]);

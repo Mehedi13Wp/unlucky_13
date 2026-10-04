@@ -23,14 +23,18 @@ class OutreachMessage extends Model
         'body',
         'status',
         'error_message',
+        'attempt_count',
         'attempted_at',
+        'retry_at',
         'sent_at',
     ];
 
     protected function casts(): array
     {
         return [
+            'attempt_count' => 'integer',
             'attempted_at' => 'datetime',
+            'retry_at' => 'datetime',
             'sent_at' => 'datetime',
         ];
     }

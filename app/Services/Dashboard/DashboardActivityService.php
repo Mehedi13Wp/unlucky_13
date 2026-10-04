@@ -6,6 +6,7 @@ use App\Enums\CampaignStatus;
 use App\Enums\LeadStatus;
 use App\Models\Lead;
 use App\Models\OutreachDraft;
+use App\Models\OutreachMessage;
 use App\Models\User;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
@@ -73,6 +74,8 @@ class DashboardActivityService
                 ."duplicates skipped {$discoveryDuplicates} · errors {$discoveryFailed} · "
                 ."saved total {$businessesFound}";
 
+        $delivery = $this->deliverySnapshot($user);
+
         return [
             'campaigns' => $campaigns,
             'active_campaigns' => $activeCampaigns,
@@ -124,7 +127,97 @@ class DashboardActivityService
             'discovery_failed' => $discoveryFailed,
             'discovery_candidates_scanned' => (int) ($discoveryTelemetry['candidates_scanned'] ?? 0),
             'discovery_detail' => $discoveryDetail,
+            ...$delivery,
             'last_cycle' => $workerStatus['last_cycle'] ?? [],
+        ];
+    }
+
+    private function deliverySnapshot(User $user): array
+    {
+        $today = [now()->startOfDay(), now()->endOfDay()];
+
+        $approvedQueue = OutreachDraft::query()
+            ->where('status', OutreachDraft::STATUS_APPROVED)
+            ->where('channel', 'email')
+            ->whereDoesntHave(
+                'message',
+                fn ($query) => $query->where('status', OutreachMessage::STATUS_SENT),
+            )
+            ->whereHas(
+                'lead.campaign',
+                fn ($query) => $query
+                    ->where('user_id', $user->id)
+                    ->where('status', CampaignStatus::Active->value),
+            )
+            ->count();
+
+        $sending = OutreachDraft::query()
+            ->where('status', OutreachDraft::STATUS_SENDING)
+            ->where('channel', 'email')
+            ->whereHas(
+                'lead.campaign',
+                fn ($query) => $query->where('user_id', $user->id),
+            )
+            ->count();
+
+        $sentToday = OutreachMessage::query()
+            ->whereHas(
+                'campaign',
+                fn ($query) => $query->where('user_id', $user->id),
+            )
+            ->where('status', OutreachMessage::STATUS_SENT)
+            ->whereBetween('sent_at', $today)
+            ->count();
+
+        $setting = $user->deliveryAutomationSetting()->first();
+        $lastStatus = (string) ($setting?->last_status ?? '');
+
+        $pausedStatuses = [
+            'no_sender_available',
+            'delivery_failed',
+            'delivery_blocked',
+            'global_daily_limit_reached',
+            'session_expired',
+        ];
+
+        $state = match (true) {
+            $sending > 0 || in_array($lastStatus, ['checking_queue', 'sending'], true) => 'sending',
+            (bool) $setting?->enabled && $approvedQueue > 0 => 'queued',
+            (bool) $setting?->enabled => 'idle',
+            in_array($lastStatus, $pausedStatuses, true) => 'paused',
+            default => 'stopped',
+        };
+
+        $detail = match ($state) {
+            'sending' => $setting?->last_message
+                ?: 'Sending one approved email from the controlled queue.',
+            'queued' => $setting?->last_message
+                ?: 'Approved email drafts are waiting for the next controlled send.',
+            'paused' => $setting?->last_message
+                ?: 'Automatic delivery is paused and needs attention.',
+            'idle' => 'Automatic delivery is active and waiting for approved email drafts.',
+            default => 'Automatic delivery is stopped. Review-before-send remains enabled.',
+        };
+
+        $globalLimit = max(0, (int) ($setting?->global_daily_limit ?? 0));
+
+        return [
+            'delivery_state' => $state,
+            'delivery_queue' => $approvedQueue,
+            'delivery_sending' => $sending,
+            'delivery_sent_today' => $sentToday,
+            'delivery_global_daily_limit' => $globalLimit,
+            'delivery_remaining_today' => max(0, $globalLimit - $sentToday),
+            'delivery_last_status' => $lastStatus ?: null,
+            'delivery_detail' => $detail,
+            'delivery_next_at' => $setting?->next_attempt_at?->toISOString(),
+            'delivery_next_label' => $setting?->next_attempt_at
+                ? 'Next attempt '.$this->relativeLabel(
+                    $setting->next_attempt_at,
+                    true,
+                    'soon',
+                )
+                : 'No send is currently scheduled',
         ];
     }
 
