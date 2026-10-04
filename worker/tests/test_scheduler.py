@@ -10,6 +10,7 @@ class FakeClient:
         self.campaigns = campaigns
         self.fail_record = fail_record
         self.recorded = []
+        self.delivery_calls = 0
 
     def active_campaigns(self):
         return {"count": len(self.campaigns), "campaigns": self.campaigns}
@@ -19,6 +20,10 @@ class FakeClient:
             raise WorkerApiError(409, "Campaign paused")
         self.recorded.append(campaign_uuid)
         return {"status": "recorded"}
+
+    def run_delivery_automation(self):
+        self.delivery_calls += 1
+        return {"status": "disabled", "sent": 0}
 
 
 class WorkerSchedulerTest(unittest.TestCase):
@@ -55,6 +60,7 @@ class WorkerSchedulerTest(unittest.TestCase):
         )
 
         self.assertEqual(["fresh-campaign"], client.recorded)
+        self.assertEqual(1, client.delivery_calls)
         self.assertEqual(1, stats["discovery_due"])
         self.assertEqual(1, stats["discovery_completed"])
         self.assertEqual(
@@ -93,7 +99,9 @@ class WorkerSchedulerTest(unittest.TestCase):
         stats = scheduler.run_cycle(SchedulerConfig())
 
         self.assertEqual([], client.recorded)
+        self.assertEqual(1, client.delivery_calls)
         self.assertEqual(1, stats["discovery_failed"])
+        self.assertEqual(1, client.delivery_calls)
         self.assertEqual(
             ["analyze", "contacts", "drafts"],
             [call[0] for call in calls[1:]],
