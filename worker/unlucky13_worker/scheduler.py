@@ -65,6 +65,9 @@ class WorkerScheduler:
             "discovery_completed": 0,
             "discovery_failed": 0,
             "pipeline_failed": 0,
+            "delivery_sent": 0,
+            "delivery_paused": 0,
+            "delivery_failed": 0,
         }
 
         if not campaigns:
@@ -143,6 +146,37 @@ class WorkerScheduler:
                     "the scheduler will continue"
                 )
 
+        if not stop_requested():
+            try:
+                delivery = self.client.run_delivery_automation()
+                stats["delivery_sent"] = int(delivery.get("sent") or 0)
+
+                paused_statuses = {
+                    "no_sender_available",
+                    "delivery_failed",
+                    "delivery_blocked",
+                    "global_daily_limit_reached",
+                    "session_expired",
+                }
+                results = list(delivery.get("results") or [])
+                stats["delivery_paused"] = sum(
+                    1
+                    for result in results
+                    if str(result.get("status") or "") in paused_statuses
+                )
+
+                print(
+                    "[scheduler] automatic delivery "
+                    f"status={delivery.get('status', 'unknown')} "
+                    f"sent={stats['delivery_sent']} "
+                    f"paused={stats['delivery_paused']}"
+                )
+            except WorkerApiError as error:
+                stats["delivery_failed"] += 1
+                print(
+                    f"[scheduler] automatic delivery API failed: {error}"
+                )
+
         return stats
 
     def run_forever(
@@ -163,8 +197,9 @@ class WorkerScheduler:
             f"pipeline_limit={settings.pipeline_limit}"
         )
         print(
-            "[scheduler] approved-email delivery is NOT automatic; "
-            "human-approved sending remains a separate command"
+            "[scheduler] automatic delivery checks are enabled; "
+            "only human-approved email drafts can be sent, and only during "
+            "an active delivery session"
         )
 
         while not stop_requested():
@@ -176,7 +211,10 @@ class WorkerScheduler:
                     f"due={stats['discovery_due']} "
                     f"discovery_ok={stats['discovery_completed']} "
                     f"discovery_failed={stats['discovery_failed']} "
-                    f"pipeline_failed={stats['pipeline_failed']}"
+                    f"pipeline_failed={stats['pipeline_failed']} "
+                    f"delivery_sent={stats['delivery_sent']} "
+                    f"delivery_paused={stats['delivery_paused']} "
+                    f"delivery_failed={stats['delivery_failed']}"
                 )
                 if on_cycle_complete is not None:
                     try:
