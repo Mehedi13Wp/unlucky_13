@@ -51,4 +51,6 @@ Route::prefix('worker')
             ->name('api.worker.delivery.queue');
         Route::post('/outreach-drafts/{outreachDraft}/send', [WorkerDeliveryController::class, 'send'])
             ->name('api.worker.delivery.send');
+        Route::post('/delivery/automation/run', [WorkerDeliveryController::class, 'runAutomation'])
+            ->name('api.worker.delivery.automation.run');
     });
