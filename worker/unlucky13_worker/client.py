@@ -111,6 +111,13 @@ class WorkerApiClient:
             allow_retries=False,
         )
 
+    def run_delivery_automation(self) -> dict[str, Any]:
+        return self._request(
+            "POST",
+            "/api/worker/delivery/automation/run",
+            allow_retries=False,
+        )
+
     def start_analysis(self, lead_uuid: str) -> dict[str, Any]:
         return self._request("POST", f"/api/worker/leads/{lead_uuid}/analysis/start")
 
