@@ -7,6 +7,7 @@ use App\Enums\LeadStatus;
 use App\Http\Controllers\Controller;
 use App\Models\OutreachDraft;
 use App\Models\OutreachMessage;
+use App\Models\SenderAccount;
 use App\Models\Suppression;
 use App\Services\Outreach\ApprovedEmailDeliveryService;
 use Illuminate\Http\JsonResponse;
@@ -29,7 +30,9 @@ class WorkerDeliveryController extends Controller
     public function queue(Request $request): JsonResponse
     {
         $limit = max(1, min((int) $request->integer('limit', 5), 25));
-        $mailer = (string) config('mail.default', 'log');
+        $legacyMailer = (string) config('mail.default', 'log');
+        $senderPoolConfigured = SenderAccount::query()->exists();
+        $mailer = $senderPoolConfigured ? 'sender_pool' : $legacyMailer;
 
         $drafts = OutreachDraft::query()
             ->where('status', OutreachDraft::STATUS_APPROVED)
@@ -43,7 +46,7 @@ class WorkerDeliveryController extends Controller
                 fn ($query) => $query->where('status', CampaignStatus::Active->value),
             )
             ->with([
-                'lead.campaign:id,uuid,name,daily_outreach_limit,status',
+                'lead.campaign:id,user_id,uuid,name,daily_outreach_limit,status',
                 'message',
             ])
             ->oldest('reviewed_at')
@@ -68,6 +71,13 @@ class WorkerDeliveryController extends Controller
                 $blockedReason = 'suppressed_recipient';
             } elseif ($remaining < 1) {
                 $blockedReason = 'daily_limit_reached';
+            } elseif (
+                SenderAccount::query()
+                    ->where('user_id', $campaign->user_id)
+                    ->exists()
+                && ! $this->hasAvailableSender($campaign->user_id)
+            ) {
+                $blockedReason = 'no_sender_available';
             }
 
             return [
@@ -92,9 +102,39 @@ class WorkerDeliveryController extends Controller
         return response()->json([
             'count' => $items->count(),
             'mailer' => $mailer,
-            'delivery_capable' => in_array($mailer, self::DELIVERY_MAILERS, true),
+            'delivery_capable' => $senderPoolConfigured
+                || in_array($legacyMailer, self::DELIVERY_MAILERS, true),
             'drafts' => $items,
         ]);
+    }
+
+    private function hasAvailableSender(int $userId): bool
+    {
+        $today = [now()->startOfDay(), now()->endOfDay()];
+
+        $accounts = SenderAccount::query()
+            ->where('user_id', $userId)
+            ->where('enabled', true)
+            ->orderBy('id')
+            ->get();
+
+        foreach ($accounts as $account) {
+            if (! $account->isConfigured()) {
+                continue;
+            }
+
+            $sentToday = OutreachMessage::query()
+                ->where('sender_account_id', $account->id)
+                ->where('status', OutreachMessage::STATUS_SENT)
+                ->whereBetween('sent_at', $today)
+                ->count();
+
+            if ($sentToday < max(1, (int) $account->daily_limit)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function send(
