@@ -15,6 +15,8 @@ class OutreachMessage extends Model
         'outreach_draft_id',
         'lead_id',
         'campaign_id',
+        'sender_account_id',
+        'sender_address',
         'channel',
         'recipient',
         'subject',
@@ -46,5 +48,10 @@ class OutreachMessage extends Model
     public function campaign(): BelongsTo
     {
         return $this->belongsTo(Campaign::class);
+    }
+
+    public function senderAccount(): BelongsTo
+    {
+        return $this->belongsTo(SenderAccount::class);
     }
 }
