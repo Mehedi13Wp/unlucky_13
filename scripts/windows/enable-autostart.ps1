@@ -3,7 +3,11 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$taskNames = @('Unlucky13 Laravel API', 'Unlucky13 Worker')
+$taskNames = @(
+    'Unlucky13 Laravel API',
+    'Unlucky13 Laravel Scheduler',
+    'Unlucky13 Worker'
+)
 
 foreach ($taskName in $taskNames) {
     $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
@@ -13,14 +17,16 @@ foreach ($taskName in $taskNames) {
     }
 
     Enable-ScheduledTask -TaskName $taskName | Out-Null
-    Write-Host "${taskName}: enabled"
+    Write-Host "$($taskName): enabled"
 }
 
 if ($StartNow) {
     Start-ScheduledTask -TaskName 'Unlucky13 Laravel API'
     Start-Sleep -Seconds 3
+    Start-ScheduledTask -TaskName 'Unlucky13 Laravel Scheduler'
+    Start-Sleep -Seconds 2
     Start-ScheduledTask -TaskName 'Unlucky13 Worker'
-    Write-Host 'Both tasks started now.'
+    Write-Host 'All three tasks started now.'
 }
 
 Write-Host ''
