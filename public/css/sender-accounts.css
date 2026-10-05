@@ -459,3 +459,41 @@
         width: 100%;
     }
 }
+
+
+.sender-status.needs_verification {
+    background: rgba(216, 184, 120, .1);
+    color: #e8c987;
+}
+
+.sender-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 7px;
+}
+
+.sender-controls form {
+    margin: 0;
+}
+
+.sender-alert-safe {
+    border-color: rgba(74, 196, 124, .28);
+    background: rgba(74, 196, 124, .08);
+}
+
+.sender-alert-safe strong {
+    color: #8bd1a4;
+}
+
+.sender-alert-errors {
+    align-items: flex-start;
+}
+
+.sender-import-errors {
+    margin: 8px 0 0;
+    padding-left: 20px;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.55;
+}
