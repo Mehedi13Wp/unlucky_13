@@ -148,11 +148,19 @@ class DeliveryAutomationService
         $settingId = (int) $gate['setting_id'];
         $intervalMinutes = (int) $gate['interval_minutes'];
 
-        if (! SenderAccount::query()->where('user_id', $userId)->exists()) {
+        $hasReadySender = SenderAccount::query()
+            ->where('user_id', $userId)
+            ->where('enabled', true)
+            ->get()
+            ->contains(fn (SenderAccount $account): bool => $account->isDeliveryReady());
+
+        if (! $hasReadySender) {
             return $this->pause(
                 $settingId,
                 'no_sender_available',
-                'You have no sender emails configured. Add sender accounts and start a new automatic delivery session.',
+                config('unlucky13.delivery_dry_run')
+                    ? 'No configured sender is available for dry-run delivery. Add or enable one, then start a new session.'
+                    : 'No verified sender is available for live delivery. Verify and enable a sender, then start a new session.',
             );
         }
 
@@ -256,7 +264,9 @@ class DeliveryAutomationService
                 return $this->pause(
                     $settingId,
                     'no_sender_available',
-                    'You have no available sender emails. Add/update sender accounts, then start a new automatic delivery session.',
+                    config('unlucky13.delivery_dry_run')
+                        ? 'You have no configured sender emails available for dry-run delivery. Fix the sender pool, then start a new session.'
+                        : 'You have no verified sender emails available for live delivery. Verify or update sender accounts, then start a new session.',
                 );
             }
 
