@@ -25,6 +25,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/dashboard/live-status', DashboardLiveStatusController::class)
         ->name('dashboard.live-status');
+    Route::view('/settings', 'settings.index')->name('settings.index');
     Route::get('/worker', [WorkerWorkspaceController::class, 'index'])->name('worker.index');
     Route::get('/worker/live-status', [WorkerWorkspaceController::class, 'live'])->name('worker.live-status');
     Route::get('/reports', ReportsController::class)->name('reports.index');
