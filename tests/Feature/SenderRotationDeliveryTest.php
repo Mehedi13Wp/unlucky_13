@@ -142,6 +142,7 @@ class SenderRotationDeliveryTest extends TestCase
             'smtp_password' => 'secret',
             'daily_limit' => $dailyLimit,
             'enabled' => true,
+            'smtp_verified_at' => now(),
         ]);
     }
 }
