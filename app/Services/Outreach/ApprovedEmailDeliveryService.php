@@ -293,7 +293,7 @@ class ApprovedEmailDeliveryService
                     ->get();
 
                 foreach ($accounts as $account) {
-                    if (! $account->isConfigured()) {
+                    if (! $account->isDeliveryReady()) {
                         continue;
                     }
 
@@ -312,7 +312,7 @@ class ApprovedEmailDeliveryService
                 if ($senderAccount === null) {
                     $transactionResult = $this->result(
                         'no_sender_available',
-                        'You have no available sender emails today. Add/update sender accounts or wait for a daily limit to reset.',
+                        'You have no delivery-ready sender emails today. Verify/enable a sender, fix its SMTP setup, or wait for a daily limit to reset.',
                         409,
                         $lockedDraft,
                         $existingMessage,
@@ -372,12 +372,12 @@ class ApprovedEmailDeliveryService
         }
 
         if ($senderAccount !== null) {
-            $this->configureSenderMailer($senderAccount);
+            app(SenderAccountMailer::class)->configure($senderAccount);
         }
 
         try {
             if ($senderAccount !== null) {
-                Mail::mailer('sender_pool')->raw(
+                Mail::mailer(SenderAccountMailer::NAME)->raw(
                     $outreachDraft->body,
                     function ($mailMessage) use ($outreachDraft, $senderAccount): void {
                         $mailMessage->from(
@@ -506,22 +506,6 @@ class ApprovedEmailDeliveryService
             $attemptCount === 2 => 15,
             default => 30,
         };
-    }
-
-    private function configureSenderMailer(SenderAccount $account): void
-    {
-        config()->set('mail.mailers.sender_pool', [
-            'transport' => 'smtp',
-            'scheme' => $account->smtp_scheme ?: 'smtp',
-            'host' => $account->smtp_host,
-            'port' => $account->smtp_port,
-            'username' => $account->smtp_username,
-            'password' => $account->smtp_password,
-            'timeout' => 30,
-            'local_domain' => parse_url((string) config('app.url'), PHP_URL_HOST),
-        ]);
-
-        app('mail.manager')->purge('sender_pool');
     }
 
     private function result(
