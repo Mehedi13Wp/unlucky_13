@@ -276,7 +276,7 @@
                                     @else
                                         <span class="sender-status needs_verification">Not verified</span>
                                         @if ($account->smtp_verification_error)
-                                            <small title="{{ $account->smtp_verification_error }}">Last test failed</small>
+                                            <small>Last test failed — check SMTP settings and try again</small>
                                         @elseif ($account->smtp_verification_attempted_at)
                                             <small>Tested {{ $account->smtp_verification_attempted_at->diffForHumans() }}</small>
                                         @else
