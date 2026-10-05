@@ -19,6 +19,9 @@ class SenderAccount extends Model
         'smtp_password',
         'daily_limit',
         'enabled',
+        'smtp_verified_at',
+        'smtp_verification_attempted_at',
+        'smtp_verification_error',
         'last_used_at',
     ];
 
@@ -31,6 +34,8 @@ class SenderAccount extends Model
             'smtp_port' => 'integer',
             'daily_limit' => 'integer',
             'enabled' => 'boolean',
+            'smtp_verified_at' => 'datetime',
+            'smtp_verification_attempted_at' => 'datetime',
             'last_used_at' => 'datetime',
         ];
     }
@@ -51,5 +56,23 @@ class SenderAccount extends Model
             && filled($this->smtp_host)
             && filled($this->smtp_username)
             && filled($this->smtp_password);
+    }
+
+    public function isVerified(): bool
+    {
+        return $this->smtp_verified_at !== null;
+    }
+
+    public function isDeliveryReady(): bool
+    {
+        if (! $this->isConfigured()) {
+            return false;
+        }
+
+        if (config('unlucky13.delivery_dry_run')) {
+            return true;
+        }
+
+        return $this->isVerified();
     }
 }
