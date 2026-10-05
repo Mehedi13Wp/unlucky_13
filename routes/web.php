@@ -33,6 +33,9 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/sender-accounts', [SenderAccountController::class, 'store'])->name('sender-accounts.store');
     Route::post('/sender-accounts/import', [SenderAccountController::class, 'import'])->name('sender-accounts.import');
     Route::patch('/sender-accounts/{senderAccount}/toggle', [SenderAccountController::class, 'toggle'])->name('sender-accounts.toggle');
+    Route::post('/sender-accounts/{senderAccount}/verify', [SenderAccountController::class, 'verify'])
+        ->middleware('throttle:5,1')
+        ->name('sender-accounts.verify');
     Route::get('/sender-accounts/template.csv', [SenderAccountController::class, 'template'])->name('sender-accounts.template');
     Route::post('/sender-accounts/automation/start', [SenderAccountController::class, 'startAutomation'])->name('sender-accounts.automation.start');
     Route::post('/sender-accounts/automation/stop', [SenderAccountController::class, 'stopAutomation'])->name('sender-accounts.automation.stop');
