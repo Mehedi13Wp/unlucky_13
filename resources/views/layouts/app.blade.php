@@ -76,7 +76,7 @@
                     <span class="nav-icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="m4 7 8 6 8-6"/><path d="M8 17h8"/></svg>
                     </span>
-                    <span>Sender Pool</span>
+                    <span>Sender Accounts</span>
                 </span>
             </a>
 
@@ -89,12 +89,25 @@
                 </span>
             </a>
 
+            <div class="nav-section">Insights</div>
+
             <a class="nav-link {{ request()->routeIs('reports.*') ? 'active' : '' }}" href="{{ route('reports.index') }}">
                 <span class="nav-link-main">
                     <span class="nav-icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>
                     </span>
                     <span>Reports</span>
+                </span>
+            </a>
+
+            <div class="nav-section">Account</div>
+
+            <a class="nav-link {{ request()->routeIs('settings.*') ? 'active' : '' }}" href="{{ route('settings.index') }}">
+                <span class="nav-link-main">
+                    <span class="nav-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.09A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.12.38.34.72.64 1 .3.27.68.4 1.08.4H21v4h-.09A1.7 1.7 0 0 0 19.4 15Z"/></svg>
+                    </span>
+                    <span>Settings</span>
                 </span>
             </a>
         </nav>
