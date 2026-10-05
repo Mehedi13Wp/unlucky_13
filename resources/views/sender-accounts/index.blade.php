@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Sender Pool')
-@section('heading', 'Sender Pool')
+@section('title', 'Sender Accounts')
+@section('heading', 'Sender Accounts')
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('css/sender-accounts.css') }}">
