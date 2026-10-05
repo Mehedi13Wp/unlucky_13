@@ -76,6 +76,46 @@ class SenderRotationDeliveryTest extends TestCase
         ]);
     }
 
+    public function test_live_manual_delivery_refuses_unverified_sender(): void
+    {
+        Mail::fake();
+
+        $user = User::factory()->create();
+        $campaign = Campaign::factory()->for($user)->create([
+            'status' => CampaignStatus::Active,
+            'daily_outreach_limit' => 20,
+        ]);
+
+        $sender = $this->sender($user, 'unverified@example.com', 20);
+        $sender->update(['smtp_verified_at' => null]);
+
+        $lead = Lead::factory()->for($campaign)->create([
+            'status' => LeadStatus::Approved,
+        ]);
+        $draft = $lead->outreachDrafts()->create([
+            'channel' => 'email',
+            'recipient' => 'hello@business.test',
+            'subject' => 'Hello',
+            'body' => 'Approved body',
+            'status' => OutreachDraft::STATUS_APPROVED,
+            'reviewed_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('outreach-drafts.send', [$lead, $draft]))
+            ->assertRedirect()
+            ->assertSessionHas('error', fn ($message) => str_contains(
+                $message,
+                'no delivery-ready sender emails',
+            ));
+
+        $this->assertSame(OutreachDraft::STATUS_APPROVED, $draft->fresh()->status);
+        $this->assertDatabaseMissing('outreach_messages', [
+            'outreach_draft_id' => $draft->id,
+            'status' => OutreachMessage::STATUS_SENT,
+        ]);
+    }
+
     public function test_delivery_stops_when_sender_pool_has_no_capacity(): void
     {
         $user = User::factory()->create();
@@ -123,7 +163,7 @@ class SenderRotationDeliveryTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('error', fn ($message) => str_contains(
                 $message,
-                'no available sender emails',
+                'no delivery-ready sender emails',
             ));
 
         $this->assertSame(OutreachDraft::STATUS_APPROVED, $draft->fresh()->status);
