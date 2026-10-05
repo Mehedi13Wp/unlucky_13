@@ -1,5 +1,9 @@
 $ErrorActionPreference = 'Continue'
-$taskNames = @('Unlucky13 Laravel API', 'Unlucky13 Worker')
+$taskNames = @(
+    'Unlucky13 Laravel API',
+    'Unlucky13 Laravel Scheduler',
+    'Unlucky13 Worker'
+)
 
 $rows = foreach ($taskName in $taskNames) {
     $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
@@ -28,4 +32,5 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 Write-Host ''
 Write-Host 'Logs:'
 Write-Host "  $(Join-Path $repoRoot 'storage\logs\unlucky13-laravel-autostart.log')"
+Write-Host "  $(Join-Path $repoRoot 'storage\logs\unlucky13-scheduler-autostart.log')"
 Write-Host "  $(Join-Path $repoRoot 'storage\logs\unlucky13-worker-autostart.log')"
