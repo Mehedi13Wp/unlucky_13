@@ -7,6 +7,7 @@ use App\Models\DeliveryAutomationSetting;
 use App\Models\OutreachDraft;
 use App\Models\OutreachMessage;
 use App\Models\SenderAccount;
+use App\Services\Outreach\SenderAccountVerifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -20,8 +21,9 @@ class SenderAccountController extends Controller
         $accounts = $request->user()->senderAccounts()->orderBy('id')->get();
         $todayStart = now()->startOfDay();
         $todayEnd = now()->endOfDay();
+        $dryRun = (bool) config('unlucky13.delivery_dry_run');
 
-        $rows = $accounts->map(function (SenderAccount $account) use ($todayStart, $todayEnd): array {
+        $rows = $accounts->map(function (SenderAccount $account) use ($todayStart, $todayEnd, $dryRun): array {
             $sentToday = OutreachMessage::query()
                 ->where('sender_account_id', $account->id)
                 ->where('status', OutreachMessage::STATUS_SENT)
@@ -34,7 +36,9 @@ class SenderAccountController extends Controller
                 ? 'disabled'
                 : (! $account->isConfigured()
                     ? 'needs_setup'
-                    : ($remaining > 0 ? 'available' : 'limit_reached'));
+                    : (! $dryRun && ! $account->isVerified()
+                        ? 'needs_verification'
+                        : ($remaining > 0 ? 'available' : 'limit_reached')));
 
             return [
                 'account' => $account,
@@ -81,6 +85,7 @@ class SenderAccountController extends Controller
             'stats' => [
                 'total' => $rows->count(),
                 'available' => $rows->where('status', 'available')->count(),
+                'verified' => $accounts->filter(fn (SenderAccount $account) => $account->isVerified())->count(),
                 'limit_reached' => $rows->where('status', 'limit_reached')->count(),
                 'disabled' => $rows->where('status', 'disabled')->count(),
                 'remaining_today' => $rows->sum('remaining_today'),
@@ -94,6 +99,7 @@ class SenderAccountController extends Controller
                     (int) $automation->global_daily_limit - $sentTodayGlobal,
                 ),
             ],
+            'dryRun' => $dryRun,
         ]);
     }
 
@@ -123,10 +129,16 @@ class SenderAccountController extends Controller
                 'smtp_password' => $validated['smtp_password'],
                 'daily_limit' => (int) $validated['daily_limit'],
                 'enabled' => true,
+                'smtp_verified_at' => null,
+                'smtp_verification_attempted_at' => null,
+                'smtp_verification_error' => null,
             ],
         );
 
-        return back()->with('success', 'Sender account saved. SMTP password is stored encrypted.');
+        return back()->with(
+            'success',
+            'Sender account saved. SMTP password is encrypted. Verify SMTP before live delivery.',
+        );
     }
 
     public function import(Request $request): RedirectResponse
@@ -162,8 +174,12 @@ class SenderAccountController extends Controller
 
         $imported = 0;
         $skipped = 0;
+        $rowNumber = 1;
+        $errors = [];
 
         while (($values = fgetcsv($handle)) !== false) {
+            $rowNumber++;
+
             if (count(array_filter($values, static fn ($value) => trim((string) $value) !== '')) === 0) {
                 continue;
             }
@@ -187,6 +203,15 @@ class SenderAccountController extends Controller
 
             if ($validator->fails()) {
                 $skipped++;
+
+                if (count($errors) < 50) {
+                    $errors[] = [
+                        'row' => $rowNumber,
+                        'email' => trim((string) ($row['email'] ?? '')) ?: '(missing email)',
+                        'errors' => $validator->errors()->all(),
+                    ];
+                }
+
                 continue;
             }
 
@@ -206,6 +231,9 @@ class SenderAccountController extends Controller
                     'smtp_password' => $data['smtp_password'],
                     'daily_limit' => (int) ($data['daily_limit'] ?? 20),
                     'enabled' => $enabled,
+                    'smtp_verified_at' => null,
+                    'smtp_verification_attempted_at' => null,
+                    'smtp_verification_error' => null,
                 ],
             );
 
@@ -214,10 +242,12 @@ class SenderAccountController extends Controller
 
         fclose($handle);
 
-        return back()->with(
-            'success',
-            "Sender CSV imported: {$imported} saved, {$skipped} skipped.",
-        );
+        return back()
+            ->with(
+                'success',
+                "Sender CSV imported: {$imported} saved, {$skipped} skipped. Imported credentials require SMTP verification before live delivery.",
+            )
+            ->with('import_errors', $errors);
     }
 
     public function toggle(Request $request, SenderAccount $senderAccount): RedirectResponse
@@ -234,6 +264,21 @@ class SenderAccountController extends Controller
         );
     }
 
+    public function verify(
+        Request $request,
+        SenderAccount $senderAccount,
+        SenderAccountVerifier $verifier,
+    ): RedirectResponse {
+        abort_unless($senderAccount->user_id === $request->user()->id, 404);
+
+        $result = $verifier->verify($senderAccount);
+
+        return back()->with(
+            $result['ok'] ? 'success' : 'error',
+            $result['message'],
+        );
+    }
+
     public function startAutomation(Request $request): RedirectResponse
     {
         $validated = $request->validate([
@@ -242,11 +287,18 @@ class SenderAccountController extends Controller
             'session_hours' => ['required', 'integer', 'between:1,12'],
         ]);
 
-        if (! $request->user()->senderAccounts()->where('enabled', true)->exists()) {
-            return back()->with(
-                'error',
-                'Add and enable at least one sender account before starting automatic delivery.',
-            );
+        $hasReadySender = $request->user()
+            ->senderAccounts()
+            ->where('enabled', true)
+            ->get()
+            ->contains(fn (SenderAccount $account): bool => $account->isDeliveryReady());
+
+        if (! $hasReadySender) {
+            $message = config('unlucky13.delivery_dry_run')
+                ? 'Add and enable at least one fully configured sender account before starting dry-run delivery.'
+                : 'Add, enable, and successfully verify at least one SMTP sender before starting live automatic delivery.';
+
+            return back()->with('error', $message);
         }
 
         $request->user()->deliveryAutomationSetting()->updateOrCreate(
@@ -261,13 +313,17 @@ class SenderAccountController extends Controller
                 'last_attempt_at' => null,
                 'next_attempt_at' => null,
                 'last_status' => 'active',
-                'last_message' => 'Automatic delivery session started. Only human-approved email drafts can be sent.',
+                'last_message' => config('unlucky13.delivery_dry_run')
+                    ? 'Dry-run automatic delivery session started. No real SMTP delivery will occur.'
+                    : 'Automatic delivery session started. Only human-approved email drafts can be sent.',
             ],
         );
 
         return back()->with(
             'success',
-            'Automatic delivery session started. Review-before-send remains required.',
+            config('unlucky13.delivery_dry_run')
+                ? 'Dry-run delivery session started. Review-before-send remains required.'
+                : 'Automatic delivery session started. Review-before-send remains required.',
         );
     }
 
