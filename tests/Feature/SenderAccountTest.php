@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\SenderAccount;
+use App\Services\Outreach\SenderAccountMailer;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -91,6 +92,18 @@ class SenderAccountTest extends TestCase
         $this->assertNotNull($sender->smtp_verified_at);
         $this->assertNotNull($sender->smtp_verification_attempted_at);
         $this->assertNull($sender->smtp_verification_error);
+    }
+
+    public function test_delivery_dry_run_configures_sender_pool_as_log_transport(): void
+    {
+        config()->set('unlucky13.delivery_dry_run', true);
+
+        $user = User::factory()->create();
+        $sender = $this->sender($user, 'sender@example.com');
+
+        app(SenderAccountMailer::class)->configure($sender);
+
+        $this->assertSame('log', config('mail.mailers.sender_pool.transport'));
     }
 
     public function test_updating_sender_credentials_clears_previous_verification(): void
