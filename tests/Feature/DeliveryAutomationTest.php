@@ -51,6 +51,47 @@ class DeliveryAutomationTest extends TestCase
         $this->assertNotNull($setting->session_ends_at);
     }
 
+    public function test_live_automation_refuses_an_unverified_sender(): void
+    {
+        $user = User::factory()->create();
+        $sender = $this->sender($user);
+        $sender->update(['smtp_verified_at' => null]);
+
+        $this->actingAs($user)
+            ->post(route('sender-accounts.automation.start'), [
+                'global_daily_limit' => 20,
+                'interval_minutes' => 15,
+                'session_hours' => 5,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('error', fn (string $message): bool => str_contains(
+                $message,
+                'successfully verify',
+            ));
+
+        $this->assertDatabaseCount('delivery_automation_settings', 0);
+    }
+
+    public function test_dry_run_allows_a_configured_unverified_sender(): void
+    {
+        config()->set('unlucky13.delivery_dry_run', true);
+
+        $user = User::factory()->create();
+        $sender = $this->sender($user);
+        $sender->update(['smtp_verified_at' => null]);
+
+        $this->actingAs($user)
+            ->post(route('sender-accounts.automation.start'), [
+                'global_daily_limit' => 1,
+                'interval_minutes' => 5,
+                'session_hours' => 1,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertTrue(DeliveryAutomationSetting::query()->firstOrFail()->enabled);
+    }
+
     public function test_worker_sends_one_approved_email_then_waits_for_interval(): void
     {
         Mail::fake();
@@ -213,6 +254,7 @@ class DeliveryAutomationTest extends TestCase
             'smtp_password' => 'secret',
             'daily_limit' => 20,
             'enabled' => true,
+            'smtp_verified_at' => now(),
         ]);
     }
 
