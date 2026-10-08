@@ -140,6 +140,23 @@ class LeadController extends Controller
             'observed_signals' => [],
         ]);
 
+        $contactEmail = strtolower(trim((string) $request->validated('contact_email')));
+
+        if ($contactEmail !== '') {
+            $lead->contacts()->create([
+                'type' => 'email',
+                'value' => $contactEmail,
+                'label' => 'Manual contact',
+                'source_url' => null,
+                'discovered_at' => now(),
+            ]);
+
+            $lead->update([
+                'contact_discovered_at' => now(),
+                'contact_discovery_version' => 2,
+            ]);
+        }
+
         return redirect()
             ->route('leads.show', $lead)
             ->with('success', 'Lead added to the discovery pipeline.');
