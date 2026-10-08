@@ -17,7 +17,7 @@ Artisan::command('unlucky13:reset-workspace {--force : Confirm destructive reset
         $this->error('Refusing to reset without --force.');
         $this->line('This removes campaign/work data but preserves users, sender accounts, and suppressions.');
 
-        return self::FAILURE;
+        return 1;
     }
 
     DB::transaction(function (): void {
@@ -54,7 +54,7 @@ Artisan::command('unlucky13:reset-workspace {--force : Confirm destructive reset
     $this->line('Preserved: users, sender accounts/SMTP verification, and suppressions.');
     $this->line('Removed: campaigns, leads, contacts, drafts, delivery history, discovery history, automation settings, queued jobs, and cache locks.');
 
-    return self::SUCCESS;
+    return 0;
 })->purpose('Reset campaign/work data while preserving login, verified senders, and suppressions');
 
 Schedule::call(function (): void {
