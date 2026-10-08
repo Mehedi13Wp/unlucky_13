@@ -110,6 +110,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     contacts.add_argument("--limit", type=int, default=5, help="Maximum qualified leads per run")
     contacts.add_argument(
+        "--lead",
+        help="Optional exact lead UUID for a controlled contact-discovery run.",
+    )
+    contacts.add_argument(
         "--delay",
         type=float,
         default=1.0,
@@ -453,7 +457,10 @@ def main(argv: list[str] | None = None) -> int:
             return 1 if failed_total else 0
 
         if args.command == "contacts":
-            queue_result = client.contact_discovery_queue(args.limit)
+            queue_result = client.contact_discovery_queue(
+                args.limit,
+                lead_uuid=args.lead,
+            )
             leads = queue_result.get("leads", [])
 
             if not leads:
