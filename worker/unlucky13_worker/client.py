@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 
@@ -66,9 +67,21 @@ class WorkerApiClient:
         safe_limit = max(1, min(limit, 25))
         return self._request("GET", f"/api/worker/analysis/queue?limit={safe_limit}")
 
-    def contact_discovery_queue(self, limit: int = 10) -> dict[str, Any]:
+    def contact_discovery_queue(
+        self,
+        limit: int = 10,
+        lead_uuid: str | None = None,
+    ) -> dict[str, Any]:
         safe_limit = max(1, min(limit, 25))
-        return self._request("GET", f"/api/worker/contact-discovery/queue?limit={safe_limit}")
+        params: dict[str, str | int] = {"limit": safe_limit}
+
+        if lead_uuid and lead_uuid.strip():
+            params["lead"] = lead_uuid.strip()
+
+        return self._request(
+            "GET",
+            "/api/worker/contact-discovery/queue?" + urlencode(params),
+        )
 
     def complete_contact_discovery(
         self,
@@ -80,8 +93,11 @@ class WorkerApiClient:
             "POST",
             f"/api/worker/leads/{lead_uuid}/contacts/complete",
             {
-                "contacts": contacts,
-                "notes": notes or [],
+                "contacts": contacts[:10],
+                "notes": [
+                    str(note)[:500]
+                    for note in (notes or [])[:20]
+                ],
             },
         )
 
