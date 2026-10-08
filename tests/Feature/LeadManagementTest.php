@@ -99,6 +99,58 @@ class LeadManagementTest extends TestCase
         $this->assertSame(LeadStatus::Discovered, $lead->status);
     }
 
+    public function test_manual_lead_can_include_contact_email_for_controlled_testing(): void
+    {
+        $user = User::factory()->create();
+        $campaign = Campaign::factory()->for($user)->create([
+            'status' => CampaignStatus::Active,
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('leads.store'), [
+                'campaign_uuid' => $campaign->uuid,
+                'business_name' => 'Controlled Test Lead',
+                'website_url' => 'controlled-test.example',
+                'contact_email' => 'My.Test+Lead@Gmail.com',
+                'source' => 'manual',
+            ])
+            ->assertRedirect();
+
+        $lead = Lead::where('business_name', 'Controlled Test Lead')->firstOrFail();
+
+        $this->assertDatabaseHas('contacts', [
+            'lead_id' => $lead->id,
+            'type' => 'email',
+            'value' => 'my.test+lead@gmail.com',
+            'label' => 'Manual contact',
+        ]);
+        $this->assertNotNull($lead->fresh()->contact_discovered_at);
+        $this->assertSame(2, $lead->fresh()->contact_discovery_version);
+    }
+
+    public function test_manual_contact_email_must_be_valid(): void
+    {
+        $user = User::factory()->create();
+        $campaign = Campaign::factory()->for($user)->create([
+            'status' => CampaignStatus::Active,
+        ]);
+
+        $this->actingAs($user)
+            ->from(route('leads.create'))
+            ->post(route('leads.store'), [
+                'campaign_uuid' => $campaign->uuid,
+                'business_name' => 'Invalid Email Lead',
+                'website_url' => 'invalid-email.example',
+                'contact_email' => 'not-an-email',
+            ])
+            ->assertRedirect(route('leads.create'))
+            ->assertSessionHasErrors('contact_email');
+
+        $this->assertDatabaseMissing('leads', [
+            'business_name' => 'Invalid Email Lead',
+        ]);
+    }
+
     public function test_duplicate_domain_is_rejected_inside_same_campaign(): void
     {
         $user = User::factory()->create();
