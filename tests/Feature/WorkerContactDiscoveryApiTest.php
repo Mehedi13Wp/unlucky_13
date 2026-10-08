@@ -67,6 +67,30 @@ class WorkerContactDiscoveryApiTest extends TestCase
             ->assertJsonPath('leads.0.business_name', 'Qualified Business');
     }
 
+    public function test_contact_queue_can_target_one_exact_qualified_lead(): void
+    {
+        $user = User::factory()->create();
+        $campaign = Campaign::factory()->for($user)->create([
+            'status' => CampaignStatus::Active,
+        ]);
+
+        $older = Lead::factory()->for($campaign)->create([
+            'status' => LeadStatus::Qualified,
+            'qualified_at' => now()->subMinute(),
+        ]);
+        $target = Lead::factory()->for($campaign)->create([
+            'status' => LeadStatus::Qualified,
+            'qualified_at' => now(),
+        ]);
+
+        $this->withToken($this->token)
+            ->getJson('/api/worker/contact-discovery/queue?limit=5&lead='.$target->uuid)
+            ->assertOk()
+            ->assertJsonPath('count', 1)
+            ->assertJsonPath('leads.0.uuid', $target->uuid)
+            ->assertJsonMissing(['uuid' => $older->uuid]);
+    }
+
     public function test_legacy_review_ready_lead_is_queued_once_for_smart_contact_upgrade(): void
     {
         $user = User::factory()->create();
