@@ -6,6 +6,7 @@ from worker.unlucky13_worker.website_analyzer import (
     WebsiteFetcher,
     WebsiteSnapshot,
     ensure_public_url,
+    normalize_http_url,
 )
 
 
@@ -34,6 +35,14 @@ class WebsiteAnalyzerTest(unittest.TestCase):
             with self.subTest(url=url):
                 with self.assertRaises(AnalyzerError):
                     ensure_public_url(url)
+
+    def test_normalizes_literal_spaces_in_path_and_query(self):
+        self.assertEqual(
+            "https://agency.example/Contact-Us?page=details&id=33212&address=881%20st%20johns%20pl.,%20brooklyn,%20NY",
+            normalize_http_url(
+                "https://agency.example/Contact-Us?page=details&id=33212&address=881 st johns pl., brooklyn, NY"
+            ),
+        )
 
     def test_fetcher_builds_www_and_apex_fallbacks_without_downgrading_https(self):
         self.assertEqual(
