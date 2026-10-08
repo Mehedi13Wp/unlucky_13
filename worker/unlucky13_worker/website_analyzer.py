@@ -9,7 +9,7 @@ from difflib import SequenceMatcher
 from html.parser import HTMLParser
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import urljoin, urlparse
+from urllib.parse import quote, urljoin, urlparse, urlsplit, urlunsplit
 from urllib.request import HTTPRedirectHandler, HTTPSHandler, Request, build_opener
 
 
@@ -72,9 +72,78 @@ def ensure_public_url(url: str) -> None:
         raise AnalyzerError("Website hostname resolves to a private or reserved network.")
 
 
+def normalize_http_url(url: str) -> str:
+    """
+    Percent-encode unsafe path/query characters while preserving normal URL
+    delimiters and existing percent escapes. This prevents urllib/http.client
+    from crashing on real-world links that contain literal spaces.
+    """
+    parsed = urlsplit(str(url or "").strip())
+
+    path = quote(
+        parsed.path,
+        safe="/%:@!def ensure_public_url(url: str) -> None:
+    parsed = urlparse(url)
+
+    if parsed.scheme not in {"http", "https"}:
+        raise AnalyzerError("Only HTTP and HTTPS website URLs are allowed.")
+
+    hostname = (parsed.hostname or "").lower().rstrip(".")
+
+    if not hostname:
+        raise AnalyzerError("Website URL does not contain a hostname.")
+
+    if hostname == "localhost" or hostname.endswith(".local"):
+        raise AnalyzerError("Local network website targets are not allowed.")
+
+    try:
+        literal = ipaddress.ip_address(hostname)
+    except ValueError:
+        literal = None
+
+    if literal is not None:
+        if not _is_public_ip(hostname):
+            raise AnalyzerError("Private or reserved IP website targets are not allowed.")
+        return
+
+    try:
+        addresses = {
+            result[4][0]
+            for result in socket.getaddrinfo(hostname, None, type=socket.SOCK_STREAM)
+        }
+    except socket.gaierror as error:
+        raise AnalyzerError(f"Could not resolve website hostname: {hostname}") from error
+
+    if not addresses:
+        raise AnalyzerError(f"Could not resolve website hostname: {hostname}")
+
+    if any(not _is_public_ip(address) for address in addresses):
+        raise AnalyzerError("Website hostname resolves to a private or reserved network.")
+'()*+,;=-._~",
+    )
+    query = quote(
+        parsed.query,
+        safe="=&%:@/?+,$;[]!()*'-._~",
+    )
+    fragment = quote(
+        parsed.fragment,
+        safe="%:@/?+,$;[]!()*'-._~",
+    )
+
+    return urlunsplit(
+        (
+            parsed.scheme,
+            parsed.netloc,
+            path,
+            query,
+            fragment,
+        )
+    )
+
+
 class _SafeRedirectHandler(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
-        target = urljoin(req.full_url, newurl)
+        target = normalize_http_url(urljoin(req.full_url, newurl))
         ensure_public_url(target)
         return super().redirect_request(req, fp, code, msg, headers, target)
 
@@ -233,10 +302,11 @@ class WebsiteFetcher:
         return self._fetch_once(url)
 
     def _fetch_once(self, url: str) -> WebsiteSnapshot:
-        ensure_public_url(url)
+        normalized_url = normalize_http_url(url)
+        ensure_public_url(normalized_url)
 
         request = Request(
-            url,
+            normalized_url,
             method="GET",
             headers={
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -269,7 +339,7 @@ class WebsiteFetcher:
                 html = body.decode(charset, errors="replace")
 
                 return WebsiteSnapshot(
-                    requested_url=url,
+                    requested_url=normalized_url,
                     final_url=final_url,
                     status_code=int(response.getcode() or 200),
                     content_type=content_type,
