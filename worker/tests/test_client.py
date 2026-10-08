@@ -116,6 +116,47 @@ class WorkerApiClientTest(unittest.TestCase):
         self.assertEqual(1, result["count"])
         self.assertEqual("http://127.0.0.1:8000/api/worker/contact-discovery/queue?limit=5", captured["url"])
 
+    def test_contact_discovery_queue_can_target_exact_lead(self):
+        captured = {}
+
+        def opener(request, timeout):
+            captured["url"] = request.full_url
+            return FakeResponse({"count": 1, "leads": [{"uuid": "lead-123"}]})
+
+        client = WorkerApiClient(
+            "http://127.0.0.1:8000",
+            "secret-token",
+            opener=opener,
+            sleeper=lambda _: None,
+        )
+        result = client.contact_discovery_queue(limit=5, lead_uuid="lead-123")
+
+        self.assertEqual(1, result["count"])
+        self.assertEqual(
+            "http://127.0.0.1:8000/api/worker/contact-discovery/queue?limit=5&lead=lead-123",
+            captured["url"],
+        )
+
+    def test_contact_completion_caps_notes_to_api_contract(self):
+        captured = {}
+
+        def opener(request, timeout):
+            captured["body"] = json.loads(request.data.decode("utf-8"))
+            return FakeResponse({"status": "completed", "contact_count": 0})
+
+        client = WorkerApiClient(
+            "http://127.0.0.1:8000",
+            "secret-token",
+            opener=opener,
+            sleeper=lambda _: None,
+        )
+        notes = [f"note-{index}-" + ("x" * 600) for index in range(25)]
+
+        client.complete_contact_discovery("lead-123", [], notes)
+
+        self.assertEqual(20, len(captured["body"]["notes"]))
+        self.assertTrue(all(len(note) <= 500 for note in captured["body"]["notes"]))
+
     def test_outreach_draft_queue_uses_worker_endpoint(self):
         captured = {}
 
