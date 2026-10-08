@@ -47,6 +47,13 @@
                 @error('website_url') <small class="field-error">{{ $message }}</small> @enderror
             </label>
 
+            <label class="field span-2">
+                <span>Contact email <small>(optional)</small></span>
+                <input type="email" name="contact_email" value="{{ old('contact_email') }}" placeholder="your-test-inbox@gmail.com">
+                <small>Use this for a known public contact or a controlled test inbox. A manually entered email skips contact rediscovery for this lead.</small>
+                @error('contact_email') <small class="field-error">{{ $message }}</small> @enderror
+            </label>
+
             <label class="field">
                 <span>Industry</span>
                 <input type="text" name="industry" value="{{ old('industry') }}" placeholder="Restaurants">
