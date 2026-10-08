@@ -17,8 +17,13 @@ class WorkerContactDiscoveryController extends Controller
     public function queue(Request $request): JsonResponse
     {
         $limit = max(1, min((int) $request->integer('limit', 10), 25));
+        $leadUuid = trim((string) $request->query('lead', ''));
 
         $leads = Lead::query()
+            ->when(
+                $leadUuid !== '',
+                fn ($query) => $query->where('uuid', $leadUuid),
+            )
             ->whereIn('status', [
                 LeadStatus::Qualified->value,
                 LeadStatus::ReadyForReview->value,
