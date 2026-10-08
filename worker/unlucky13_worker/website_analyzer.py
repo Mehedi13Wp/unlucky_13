@@ -82,44 +82,7 @@ def normalize_http_url(url: str) -> str:
 
     path = quote(
         parsed.path,
-        safe="/%:@!def ensure_public_url(url: str) -> None:
-    parsed = urlparse(url)
-
-    if parsed.scheme not in {"http", "https"}:
-        raise AnalyzerError("Only HTTP and HTTPS website URLs are allowed.")
-
-    hostname = (parsed.hostname or "").lower().rstrip(".")
-
-    if not hostname:
-        raise AnalyzerError("Website URL does not contain a hostname.")
-
-    if hostname == "localhost" or hostname.endswith(".local"):
-        raise AnalyzerError("Local network website targets are not allowed.")
-
-    try:
-        literal = ipaddress.ip_address(hostname)
-    except ValueError:
-        literal = None
-
-    if literal is not None:
-        if not _is_public_ip(hostname):
-            raise AnalyzerError("Private or reserved IP website targets are not allowed.")
-        return
-
-    try:
-        addresses = {
-            result[4][0]
-            for result in socket.getaddrinfo(hostname, None, type=socket.SOCK_STREAM)
-        }
-    except socket.gaierror as error:
-        raise AnalyzerError(f"Could not resolve website hostname: {hostname}") from error
-
-    if not addresses:
-        raise AnalyzerError(f"Could not resolve website hostname: {hostname}")
-
-    if any(not _is_public_ip(address) for address in addresses):
-        raise AnalyzerError("Website hostname resolves to a private or reserved network.")
-'()*+,;=-._~",
+        safe="/%:@!$&'()*+,;=-._~",
     )
     query = quote(
         parsed.query,
